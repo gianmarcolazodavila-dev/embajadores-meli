@@ -105,12 +105,12 @@ export default function Embajador() {
   const [copied, setCopied] = useState(false)
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
+    localStorage.removeItem('auth_token')
     navigate('/login')
   }, [navigate])
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('auth_token')
     if (!token) { navigate('/login'); return }
 
     let payload: JwtPayload
