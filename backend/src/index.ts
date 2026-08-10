@@ -1,6 +1,7 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import authRouter from './auth/router'
+import './milestones/jobs/validate-hitos'
 
 dotenv.config()
 
