@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Layout, { type NavItem } from '../components/Layout'
+import StatusLegend from '../components/StatusLegend'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -363,6 +364,7 @@ function SeccionMGM() {
                   <p style={{ fontWeight: 600, color: '#333', margin: '0 0 3px', fontSize: '14px' }}>{r.negocio}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <StatePill estado={r.estado} />
+                    <StatusLegend type="mgm" />
                     <span style={{ fontSize: '11px', color: '#999' }}>{r.hitos.length}/{HITOS_DEF.length} hitos completados</span>
                   </div>
                 </div>
@@ -392,7 +394,13 @@ function SeccionMGM() {
 
 function SeccionMGB() {
   const [copied, setCopied] = useState(false)
-  const totalCoins = BUYERS_MGB.reduce((s, b) => s + b.coins, 0)
+
+  const mgbStats = {
+    compradores: BUYERS_MGB.length,
+    nmv: BUYERS_MGB.reduce((s, b) => s + b.nmv, 0),
+    compras: BUYERS_MGB.reduce((s, b) => s + b.compras, 0),
+    coins: BUYERS_MGB.reduce((s, b) => s + b.coins, 0),
+  }
 
   const copy = () => {
     navigator.clipboard.writeText(`https://www.mercadolibre.com.pe/?ref=${USUARIO.mercado === 'Wilson' ? 'EMBA-JG01' : 'EMBA-XX00'}`)
@@ -424,39 +432,24 @@ function SeccionMGB() {
         </p>
       </div>
 
-      {/* Tabla compradores */}
-      <div style={card}>
-        <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 16px' }}>
-          Actividad de compradores
-        </p>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
-              {['Comprador','Compras realizadas','NMV generado','Coins ganados','Estado'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '0 0 10px', fontSize: '11px', fontWeight: 600, color: '#999', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {BUYERS_MGB.map((b, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #F9F9F9' }}>
-                <td style={{ padding: '12px 0', fontWeight: 500 }}>{b.nombre}</td>
-                <td style={{ padding: '12px 12px 12px 0', color: '#555' }}>{b.compras} compras</td>
-                <td style={{ padding: '12px 12px 12px 0', color: '#555' }}>S/ {b.nmv.toLocaleString('es-PE')}</td>
-                <td style={{ padding: '12px 12px 12px 0', fontWeight: 700, color: '#00A650' }}>+{b.coins} 🪙</td>
-                <td style={{ padding: '12px 0' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: b.estadoColor }}>
-                    {b.estado === 'Recurrente' ? '🟢' : '🔵'} {b.estado}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ marginTop: '16px', background: '#F9F9F9', borderRadius: '6px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#555', fontWeight: 500 }}>Total ganado por MGB</span>
-          <span style={{ fontWeight: 800, color: '#333', fontSize: '16px' }}>{totalCoins} coins 🪙</span>
-        </div>
+      {/* Métricas agregadas — sin datos individuales de compradores */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+        {[
+          { icon: '🛒', label: 'compradores han usado tu cupón', value: mgbStats.compradores },
+          { icon: '💰', label: 'NMV generado',                   value: `S/ ${mgbStats.nmv.toLocaleString('es-PE')}` },
+          { icon: '🔄', label: 'compras totales',                value: mgbStats.compras },
+          { icon: '🪙', label: 'coins ganados por MGB',          value: mgbStats.coins },
+        ].map((s, i) => (
+          <div key={i} style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '28px' }}>{s.icon}</span>
+              <div>
+                <p style={{ fontSize: '22px', fontWeight: 800, color: '#333', margin: '0 0 2px' }}>{s.value}</p>
+                <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{s.label}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

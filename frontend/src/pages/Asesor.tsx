@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Layout, { type NavItem } from '../components/Layout'
+import StatusLegend from '../components/StatusLegend'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -267,7 +268,7 @@ function SeccionEmbajadores() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <p style={{ fontWeight: 700, fontSize: '15px', color: '#333', margin: 0 }}>{emb.nombre}</p>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#00A650' }}>🟢 {emb.estado}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#00A650', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🟢 {emb.estado} <StatusLegend type="embajador" /></span>
                   </div>
                   <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>{emb.mercado}</p>
                 </div>
@@ -317,7 +318,11 @@ function SeccionEmbajadores() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
                           {['Negocio','Estado','Hitos completados','Coins generados'].map(h => (
-                            <th key={h} style={{ textAlign: 'left', padding: '0 0 10px', fontSize: '11px', fontWeight: 600, color: '#999' }}>{h}</th>
+                            <th key={h} style={{ textAlign: 'left', padding: '0 0 10px', fontSize: '11px', fontWeight: 600, color: '#999' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                {h}{h === 'Estado' && <StatusLegend type="mgm" />}
+                              </span>
+                            </th>
                           ))}
                         </tr>
                       </thead>
