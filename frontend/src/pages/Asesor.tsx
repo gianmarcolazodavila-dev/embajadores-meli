@@ -1,23 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api, type Embajador } from '../services/api'
 
-// ─── Demo data ────────────────────────────────────────────────────────────────
+// ─── Fallback demo data ───────────────────────────────────────────────────────
 
-const EMBAJADORES = [
-  { id: 'EMB001', nombre: 'Jose Garcia',  mercado: 'Wilson',        coins: 520, referidos: 2, coupon: 'EMBA-JG01' },
-  { id: 'EMB002', nombre: 'Maria Quispe', mercado: 'Polvos Azules', coins: 195, referidos: 1, coupon: 'EMBA-MQ02' },
+const DEMO_EMBAJADORES: Embajador[] = [
+  { ambassador_id: 'EMB001', nombre: 'Jose Garcia',  mercado: 'Wilson',        coins: 520, coupon_mgb: 'EMBA-JG01', status: 'activo' },
+  { ambassador_id: 'EMB002', nombre: 'Maria Quispe', mercado: 'Polvos Azules', coins: 195, coupon_mgb: 'EMBA-MQ02', status: 'activo' },
 ]
 
 const REFERIDOS = [
-  { negocio: 'Tienda Tech Lima', ruc: '20123456789', embajador: 'Jose Garcia',  estado: 'activo',   dias: 90, hitos: 3 },
-  { negocio: 'Moda y Mas',       ruc: '20987654321', embajador: 'Jose Garcia',  estado: 'validado', dias: 88, hitos: 1 },
+  { negocio: 'Tienda Tech Lima', ruc: '20123456789', embajador: 'Jose Garcia',  estado: 'activo',    dias: 90, hitos: 3 },
+  { negocio: 'Moda y Mas',       ruc: '20987654321', embajador: 'Jose Garcia',  estado: 'validado',  dias: 88, hitos: 1 },
   { negocio: 'Electro Norte',    ruc: '20456789123', embajador: 'Maria Quispe', estado: 'pendiente', dias: 90, hitos: 0 },
 ]
 
 const REFERIDOS_MGB = [
-  { buyer: 'Ana Torres',    embajador: 'Jose Garcia',  compras: 3, total_nmv: 450, coins_gen: 195, estado: 'recurrente' },
-  { buyer: 'Luis Mendoza',  embajador: 'Jose Garcia',  compras: 1, total_nmv: 89,  coins_gen: 65,  estado: 'nuevo' },
-  { buyer: 'Carmen Diaz',   embajador: 'Maria Quispe', compras: 2, total_nmv: 210, coins_gen: 130, estado: 'activo' },
+  { buyer: 'Ana Torres',   embajador: 'Jose Garcia',  compras: 3, total_nmv: 450, coins_gen: 195, estado: 'recurrente' },
+  { buyer: 'Luis Mendoza', embajador: 'Jose Garcia',  compras: 1, total_nmv: 89,  coins_gen: 65,  estado: 'nuevo' },
+  { buyer: 'Carmen Diaz',  embajador: 'Maria Quispe', compras: 2, total_nmv: 210, coins_gen: 130, estado: 'activo' },
 ]
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -56,6 +57,26 @@ const TAB_LABELS: Record<Tab, string> = {
 export default function Asesor() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tab>('embajadores')
+  const [embajadores, setEmbajadores] = useState<Embajador[]>(DEMO_EMBAJADORES)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.getEmbajadores()
+      .then(setEmbajadores)
+      .catch(() => { /* fallo silencioso — se usa demo data */ })
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block w-10 h-10 border-4 border-[#3483FA] border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-sm text-gray-400">Cargando…</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,13 +111,11 @@ export default function Asesor() {
           ))}
         </div>
 
-        {/* ── Tab: Embajadores ── */}
+        {/* Tab: Embajadores */}
         {activeTab === 'embajadores' && (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Embajadores ({EMBAJADORES.length})
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">Embajadores ({embajadores.length})</h2>
             </div>
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
@@ -106,16 +125,15 @@ export default function Asesor() {
                       <th className="py-3 pl-6 font-medium">Nombre</th>
                       <th className="py-3 font-medium">Mercado</th>
                       <th className="py-3 font-medium">Coins</th>
-                      <th className="py-3 font-medium text-center">Referidos</th>
                       <th className="py-3 pr-6 font-medium">Cupón</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {EMBAJADORES.map((emb) => (
-                      <tr key={emb.id} className="border-b border-gray-50 last:border-0">
+                    {embajadores.map((emb) => (
+                      <tr key={emb.ambassador_id} className="border-b border-gray-50 last:border-0">
                         <td className="py-3 pl-6">
                           <p className="font-semibold text-gray-900">{emb.nombre}</p>
-                          <p className="text-xs text-gray-400">{emb.id}</p>
+                          <p className="text-xs text-gray-400">{emb.ambassador_id}</p>
                         </td>
                         <td className="py-3">
                           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${MERCADO_STYLES[emb.mercado] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -125,8 +143,7 @@ export default function Asesor() {
                         <td className="py-3 font-semibold text-[#3483FA]">
                           {emb.coins.toLocaleString('es-PE')}
                         </td>
-                        <td className="py-3 text-center text-gray-600">{emb.referidos}</td>
-                        <td className="py-3 pr-6 font-mono text-gray-700">{emb.coupon}</td>
+                        <td className="py-3 pr-6 font-mono text-gray-700">{emb.coupon_mgb}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -136,13 +153,11 @@ export default function Asesor() {
           </>
         )}
 
-        {/* ── Tab: Referidos MGM ── */}
+        {/* Tab: Referidos MGM */}
         {activeTab === 'mgm' && (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Referidos MGM ({REFERIDOS.length})
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">Referidos MGM ({REFERIDOS.length})</h2>
             </div>
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
@@ -170,14 +185,9 @@ export default function Asesor() {
                         </td>
                         <td className="py-3 text-center text-gray-500">{r.dias}d</td>
                         <td className="py-3 pr-6 text-center">
-                          <span className="text-xs font-semibold text-gray-600">
-                            {r.hitos}/{HITO_TOTAL}
-                          </span>
+                          <span className="text-xs font-semibold text-gray-600">{r.hitos}/{HITO_TOTAL}</span>
                           <div className="mt-1 bg-gray-100 rounded-full h-1.5 mx-auto max-w-[48px]">
-                            <div
-                              className="bg-[#3483FA] h-1.5 rounded-full"
-                              style={{ width: `${(r.hitos / HITO_TOTAL) * 100}%` }}
-                            />
+                            <div className="bg-[#3483FA] h-1.5 rounded-full" style={{ width: `${(r.hitos / HITO_TOTAL) * 100}%` }} />
                           </div>
                         </td>
                       </tr>
@@ -189,13 +199,11 @@ export default function Asesor() {
           </>
         )}
 
-        {/* ── Tab: Referidos MGB ── */}
+        {/* Tab: Referidos MGB */}
         {activeTab === 'mgb' && (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Referidos MGB ({REFERIDOS_MGB.length})
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">Referidos MGB ({REFERIDOS_MGB.length})</h2>
             </div>
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
@@ -216,12 +224,8 @@ export default function Asesor() {
                         <td className="py-3 pl-6 font-semibold text-gray-900">{r.buyer}</td>
                         <td className="py-3 text-gray-600">{r.embajador}</td>
                         <td className="py-3 text-center text-gray-600">{r.compras}</td>
-                        <td className="py-3 text-right text-gray-600">
-                          S/ {r.total_nmv.toLocaleString('es-PE')}
-                        </td>
-                        <td className="py-3 text-right font-semibold text-green-600">
-                          +{r.coins_gen}
-                        </td>
+                        <td className="py-3 text-right text-gray-600">S/ {r.total_nmv.toLocaleString('es-PE')}</td>
+                        <td className="py-3 text-right font-semibold text-green-600">+{r.coins_gen}</td>
                         <td className="py-3 pr-6">
                           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${ESTADO_MGB_STYLES[r.estado] ?? ''}`}>
                             {r.estado}
