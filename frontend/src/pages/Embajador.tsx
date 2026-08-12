@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  getEmbajador, getReferidosMGM, getWallet,
-  type GASEmbajador, type GASReferralMGM, type GASTransaction,
-} from '../lib/gas'
+import { api } from '../api/sheets'
 
 // ─── Datos estáticos ──────────────────────────────────────────────────────────
 
@@ -51,9 +48,9 @@ export default function Embajador() {
   const [searchParams] = useSearchParams()
   const id = searchParams.get('id') ?? ''
 
-  const [embajador, setEmbajador]   = useState<GASEmbajador | null>(null)
-  const [referrals, setReferrals]   = useState<GASReferralMGM[]>([])
-  const [transactions, setTransactions] = useState<GASTransaction[]>([])
+  const [embajador, setEmbajador]   = useState<any>(null)
+  const [referrals, setReferrals]   = useState<any[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
   const [copied, setCopied]         = useState(false)
@@ -62,9 +59,9 @@ export default function Embajador() {
     if (!id) { navigate('/login', { replace: true }); return }
 
     Promise.all([
-      getEmbajador(id),
-      getReferidosMGM(id),
-      getWallet(id),
+      api.getEmbajador(id),
+      api.getReferidosMGM(id),
+      api.getWallet(id),
     ])
       .then(([emb, refs, txs]) => {
         setEmbajador(emb)
@@ -231,7 +228,7 @@ export default function Embajador() {
                 </thead>
                 <tbody>
                   {referrals.map((r, i) => {
-                    const achieved = new Set(r.milestones.map((m) => m.tipo))
+                    const achieved = new Set(r.milestones.map((m: any) => m.tipo))
                     return (
                       <tr key={r.id ?? i} className="border-b border-gray-50 last:border-0">
                         <td className="py-3 pl-2 pr-4">

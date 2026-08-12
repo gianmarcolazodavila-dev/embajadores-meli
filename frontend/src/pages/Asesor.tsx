@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getEmbajadores, type GASEmbajador } from '../lib/gas'
+import { api } from '../api/sheets'
 
 const MERCADO_STYLES: Record<string, string> = {
   wilson:         'bg-blue-100 text-blue-800',
@@ -16,12 +16,12 @@ const MERCADO_LABELS: Record<string, string> = {
 
 export default function Asesor() {
   const navigate = useNavigate()
-  const [embajadores, setEmbajadores] = useState<GASEmbajador[]>([])
+  const [embajadores, setEmbajadores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getEmbajadores()
+    api.getEmbajadores()
       .then(setEmbajadores)
       .catch(() => setError('No se pudo cargar la lista de embajadores.'))
       .finally(() => setLoading(false))

@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getEmbajadores, type GASEmbajador } from '../lib/gas'
+import { api } from '../api/sheets'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [embajadores, setEmbajadores] = useState<GASEmbajador[]>([])
+  const [embajadores, setEmbajadores] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getEmbajadores()
+    api.getEmbajadores()
       .then((data) => {
         setEmbajadores(data)
         if (data.length > 0) setSelectedId(data[0].id)
