@@ -219,7 +219,7 @@ function SeccionResumen({ onNavigate, canjes }: { onNavigate: (s: EmbSection) =>
         <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Historial de canjes</p>
         {canjes.length === 0 ? (
           <p style={{ fontSize: '13px', color: '#999' }}>
-            Aún no tenés canjes registrados. Tu próximo corte es el <strong>15 de agosto</strong>.
+            Aún no tienes canjes registrados. Tu próximo corte es el <strong>15 de agosto</strong>.
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -304,7 +304,7 @@ function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) 
 
   return (
     <div style={{ maxWidth: '720px' }}>
-      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>Completá los datos del negocio que querés incorporar a MercadoLibre.</p>
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>Completa los datos del negocio que quieres incorporar a MercadoLibre.</p>
       <form onSubmit={(e) => { e.preventDefault(); if (validate()) setShowModal(true) }}>
         <div style={card}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '18px' }}>
@@ -313,7 +313,7 @@ function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) 
             <div>
               <label style={lbl}>Mercado donde vende *</label>
               <select style={inp(!!errors.mercado)} value={form.mercado} onChange={F('mercado')}>
-                <option value="">Seleccioná...</option>
+                <option value="">Selecciona...</option>
                 {['Wilson','Polvos Azules','Gamarra','Otro'].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               {errors.mercado && <p style={err}>{errors.mercado}</p>}
@@ -449,7 +449,7 @@ function SeccionMGB() {
           </button>
         </div>
         <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.60)', margin: 0 }}>
-          Compartí este código con compradores. Cuando lo usen en su primera compra en MercadoLibre, ambos ganan.
+          Comparte este código con compradores. Cuando lo usen en su primera compra en MercadoLibre, ambos ganan.
         </p>
       </div>
 

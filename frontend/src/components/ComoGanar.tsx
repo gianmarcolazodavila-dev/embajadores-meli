@@ -115,10 +115,10 @@ export default function ComoGanar({ onGoToPremios }: ComoGanarProps) {
           MISIÓN MGM
         </p>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1D1D1B', margin: '0 0 4px' }}>
-          🤝 Referí un Vendedor
+          🤝 Refiere un Vendedor
         </h3>
         <p style={{ fontSize: '13px', color: '#666', margin: '0 0 20px' }}>
-          Referí un negocio real y ganás coins a medida que crece en MercadoLibre.
+          Refiere un negocio real y ganas coins a medida que crece en MercadoLibre.
         </p>
 
         <FlowPasos pasos={MGM_PASOS} color="#FFE600" />
@@ -142,10 +142,10 @@ export default function ComoGanar({ onGoToPremios }: ComoGanarProps) {
           MISIÓN MGB
         </p>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1D1D1B', margin: '0 0 4px' }}>
-          🛍️ Referí un Comprador
+          🛍️ Refiere un Comprador
         </h3>
         <p style={{ fontSize: '13px', color: '#666', margin: '0 0 20px' }}>
-          Compartí tu cupón y ganás coins cuando tus compradores realizan compras válidas.
+          Comparte tu cupón y ganas coins cuando tus compradores realizan compras válidas.
         </p>
 
         <FlowPasos pasos={MGB_PASOS} color="#3483FA" />

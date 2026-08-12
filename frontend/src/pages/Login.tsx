@@ -26,7 +26,7 @@ export default function Login() {
             Mercado Libre · Perú
           </p>
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', margin: 0 }}>
-            Seleccioná tu vista para continuar
+            Selecciona tu vista para continuar
           </p>
         </div>
 
