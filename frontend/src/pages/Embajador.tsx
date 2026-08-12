@@ -1,48 +1,143 @@
 import { useState } from 'react'
 import Layout, { type NavItem } from '../components/Layout'
 import StatusLegend from '../components/StatusLegend'
+import ComoGanar from '../components/ComoGanar'
+import { useMobile } from '../contexts/MobileContext'
 
-// ─── Tipos ───────────────────────────────────────────────────────────────────
+// ─── Constantes del programa ──────────────────────────────────────────────────
 
-type EmbSection = 'resumen' | 'agrega' | 'mgm' | 'mgb' | 'premios'
+const COINS_RATE = 10 // 10 Meli Coins ≈ S/ 1
 
-// ─── Datos hardcodeados ───────────────────────────────────────────────────────
+// ─── Datos hardcodeados (fuente de verdad) ────────────────────────────────────
 
-const USUARIO = { nombre: 'Jose Garcia', mercado: 'Wilson', coins: 520 }
+const MGM_COINS = 450 + 100           // REF001 (450) + REF002 (100)
+const MGB_COINS = 125 + 50            // Buyer1 (125) + Buyer2 (50)
+const TOTAL_COINS = MGM_COINS + MGB_COINS  // 725
 
-const WALLET_MGM = [
-  { descripcion: '📦 30 productos publicados · Tienda Tech Lima', coins: 260, fecha: '2026-08-12' },
-  { descripcion: '🎉 Primera venta realizada · Tienda Tech Lima', coins: 195, fecha: '2026-08-11' },
-  { descripcion: '📦 10 productos publicados · Tienda Tech Lima', coins: 130, fecha: '2026-08-10' },
+const USUARIO = { nombre: 'Jose Garcia', mercado: 'Wilson', coins: TOTAL_COINS }
+
+const WALLET_TRANSACTIONS = [
+  { descripcion: 'Hito: recurrencia (MGB)',                   coins: 75,  fecha: '2026-08-12', tipo: 'mgb' },
+  { descripcion: 'Hito: primera_compra (MGB)',                coins: 50,  fecha: '2026-08-10', tipo: 'mgb' },
+  { descripcion: 'Hito: primera_venta · Tienda Tech Lima',    coins: 150, fecha: '2026-08-09', tipo: 'mgm' },
+  { descripcion: 'Hito: catalogo_30 · Tienda Tech Lima',      coins: 200, fecha: '2026-08-05', tipo: 'mgm' },
+  { descripcion: 'Hito: primera_compra (MGB)',                coins: 50,  fecha: '2026-08-03', tipo: 'mgb' },
+  { descripcion: 'Hito: catalogo_10 · Moda y Mas',            coins: 100, fecha: '2026-07-28', tipo: 'mgm' },
+  { descripcion: 'Hito: catalogo_10 · Tienda Tech Lima',      coins: 100, fecha: '2026-06-15', tipo: 'mgm' },
 ]
 
 const REFERIDOS_MGM = [
-  { id: 'REF001', negocio: 'Tienda Tech Lima', estado: 'activo',   coins: 585, hitos: ['catalogo_10','catalogo_30','primera_venta','seller_desarrollo'] },
-  { id: 'REF002', negocio: 'Moda y Mas',       estado: 'validado', coins: 130, hitos: ['catalogo_10'] },
-]
-
-const BUYERS_MGB = [
-  { nombre: 'Ana Torres',   compras: 3, nmv: 450, coins: 195, estado: 'Recurrente', estadoColor: '#00A650' },
-  { nombre: 'Luis Mendoza', compras: 1, nmv: 89,  coins: 65,  estado: 'Nuevo',      estadoColor: '#3483FA' },
+  { id: 'REF001', negocio: 'Tienda Tech Lima', estado: 'activo',   coins: 450, hitos: ['catalogo_10', 'catalogo_30', 'primera_venta'] },
+  { id: 'REF002', negocio: 'Moda y Mas',       estado: 'validado', coins: 100, hitos: ['catalogo_10'] },
 ]
 
 const HITOS_DEF = [
-  { id: 'catalogo_10',       label: '10 productos', coins: 130 },
-  { id: 'catalogo_30',       label: '30 productos', coins: 260 },
-  { id: 'catalogo_100',      label: '100 productos', coins: 390 },
-  { id: 'primera_venta',     label: 'Primera venta', coins: 195 },
-  { id: 'seller_desarrollo', label: 'En desarrollo', coins: 390 },
-  { id: 'seller_activado',   label: 'Activado', coins: 585 },
+  { id: 'catalogo_10',       label: '10 productos', coins: 100 },
+  { id: 'catalogo_30',       label: '30 productos', coins: 200 },
+  { id: 'catalogo_100',      label: '100 productos', coins: 300 },
+  { id: 'primera_venta',     label: 'Primera venta', coins: 150 },
+  { id: 'seller_desarrollo', label: 'En desarrollo', coins: 300 },
+  { id: 'seller_activado',   label: 'Activado', coins: 450 },
 ]
 
-const PREMIOS = [
-  { id: 'polo',    emoji: '🎽', nombre: 'Polo Mercado Libre',    coins: 200, popular: false },
-  { id: 'gorra',   emoji: '🧢', nombre: 'Gorra MELI',           coins: 150, popular: false },
-  { id: 'mochila', emoji: '🎒', nombre: 'Mochila Oficial',       coins: 400, popular: false },
-  { id: 'credito', emoji: '📱', nombre: 'Crédito S/50 en MELI', coins: 300, popular: true },
-  { id: 'bolsas',  emoji: '🛍️', nombre: 'Bolsas de tela (x5)',  coins: 100, popular: false },
-  { id: 'kit',     emoji: '🏆', nombre: 'Kit Embajador Premium', coins: 600, popular: false },
+const MGB_STATS = {
+  compradores: 2,
+  nmv: 539,
+  compras: 4,
+  coins: MGB_COINS,
+}
+
+interface Premio {
+  id: string
+  categoria: string
+  emoji: string
+  nombre: string
+  coins: number
+  soles: number
+}
+
+const PREMIO_CATEGORIAS: { cat: string; emoji: string; items: Premio[] }[] = [
+  {
+    cat: 'Premios Inmediatos', emoji: '🎁',
+    items: [
+      { id: 'gc30',  categoria: 'Premios Inmediatos', emoji: '🎁', nombre: 'Gift card consumo (supermercado/delivery)', coins: 300,  soles: 30  },
+      { id: 'gc50',  categoria: 'Premios Inmediatos', emoji: '🎁', nombre: 'Gift card libre elección',                  coins: 500,  soles: 50  },
+      { id: 'gc75',  categoria: 'Premios Inmediatos', emoji: '🎁', nombre: 'Gift card premium',                         coins: 750,  soles: 75  },
+      { id: 'gc100', categoria: 'Premios Inmediatos', emoji: '🎁', nombre: 'Gift card mayor valor',                     coins: 1000, soles: 100 },
+    ],
+  },
+  {
+    cat: 'Tecnología', emoji: '💻',
+    items: [
+      { id: 'audio',  categoria: 'Tecnología', emoji: '🎧', nombre: 'Audífonos o parlante',              coins: 1500,  soles: 150  },
+      { id: 'teclado',categoria: 'Tecnología', emoji: '⌨️', nombre: 'Teclado y mouse premium',            coins: 2500,  soles: 250  },
+      { id: 'watch',  categoria: 'Tecnología', emoji: '⌚', nombre: 'Smartwatch o impresora térmica',     coins: 4000,  soles: 400  },
+      { id: 'monitor',categoria: 'Tecnología', emoji: '🖥️', nombre: 'Monitor',                            coins: 6000,  soles: 600  },
+      { id: 'phone',  categoria: 'Tecnología', emoji: '📱', nombre: 'Smartphone',                         coins: 10000, soles: 1000 },
+    ],
+  },
+  {
+    cat: 'Crecimiento del Negocio', emoji: '📈',
+    items: [
+      { id: 'foto',  categoria: 'Crecimiento del Negocio', emoji: '📸', nombre: 'Sesión de fotografía de productos',           coins: 1500, soles: 150 },
+      { id: 'diseno',categoria: 'Crecimiento del Negocio', emoji: '🎨', nombre: 'Diseño de identidad o contenido digital',     coins: 2500, soles: 250 },
+      { id: 'soft',  categoria: 'Crecimiento del Negocio', emoji: '💾', nombre: 'Licencia de software para el negocio',        coins: 4000, soles: 400 },
+      { id: 'prod',  categoria: 'Crecimiento del Negocio', emoji: '🎬', nombre: 'Producción profesional fotos y videos',       coins: 6000, soles: 600 },
+    ],
+  },
+  {
+    cat: 'Experiencias', emoji: '✈️',
+    items: [
+      { id: 'cena',   categoria: 'Experiencias', emoji: '🍽️', nombre: 'Cena para dos',                          coins: 2000,  soles: 200  },
+      { id: 'familia',categoria: 'Experiencias', emoji: '🎭', nombre: 'Experiencia familiar o entradas premium', coins: 3500,  soles: 350  },
+      { id: 'hotel',  categoria: 'Experiencias', emoji: '🏨', nombre: 'Estadía de fin de semana',                coins: 6000,  soles: 600  },
+      { id: 'viaje',  categoria: 'Experiencias', emoji: '✈️', nombre: 'Viaje nacional para dos',                 coins: 12000, soles: 1200 },
+    ],
+  },
 ]
+
+// Demo canje previo
+interface Canje {
+  premio: string
+  coins: number
+  fecha: string
+  estado: 'En proceso' | 'Entregado'
+  entrega: string
+}
+
+const DEMO_CANJE: Canje = {
+  premio: 'Gift card consumo', coins: 300,
+  fecha: '15 jul 2026', estado: 'Entregado', entrega: '1–7 ago 2026',
+}
+
+// ─── Nav ──────────────────────────────────────────────────────────────────────
+
+type EmbSection = 'resumen' | 'como-ganar' | 'agrega' | 'mgm' | 'mgb' | 'premios'
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'resumen',    emoji: '🏠', label: 'Resumen' },
+  { id: 'como-ganar', emoji: '❓', label: 'Cómo ganar Coins' },
+  { id: 'agrega',    emoji: '➕', label: 'Agrega un Negocio' },
+  { id: 'mgm',       emoji: '📦', label: 'Mis Puntos MGM' },
+  { id: 'mgb',       emoji: '🛒', label: 'Mis Puntos MGB' },
+  { id: 'premios',   emoji: '🎁', label: 'Canjear Premios' },
+]
+
+const SECTION_TITLES: Record<EmbSection, string> = {
+  'resumen':    'Resumen',
+  'como-ganar': 'Cómo ganar Coins',
+  'agrega':     'Agrega un Negocio',
+  'mgm':        'Mis Puntos MGM',
+  'mgb':        'Mis Puntos MGB',
+  'premios':    'Canjear Premios',
+}
+
+// ─── Estilos base ─────────────────────────────────────────────────────────────
+
+const card: React.CSSProperties = {
+  background: '#fff', borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px',
+}
 
 const ESTADO_PILL: Record<string, { bg: string; color: string }> = {
   activo:   { bg: '#E8F8EF', color: '#00A650' },
@@ -51,36 +146,10 @@ const ESTADO_PILL: Record<string, { bg: string; color: string }> = {
   rechazado:{ bg: '#FFECEC', color: '#E01D1D' },
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: 'resumen', emoji: '🏠', label: 'Resumen' },
-  { id: 'agrega',  emoji: '➕', label: 'Agrega un Negocio' },
-  { id: 'mgm',     emoji: '📦', label: 'Mis Puntos MGM' },
-  { id: 'mgb',     emoji: '🛒', label: 'Mis Puntos MGB' },
-  { id: 'premios', emoji: '🎁', label: 'Canjear Premios' },
-]
-
-const SECTION_TITLES: Record<EmbSection, string> = {
-  resumen: 'Resumen',
-  agrega:  'Agrega un Negocio',
-  mgm:     'Mis Puntos MGM',
-  mgb:     'Mis Puntos MGB',
-  premios: 'Canjear Premios',
-}
-
-// ─── Helpers de estilo ────────────────────────────────────────────────────────
-
-const card: React.CSSProperties = {
-  background: '#fff', borderRadius: '8px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px',
-}
-
 function StatePill({ estado }: { estado: string }) {
   const s = ESTADO_PILL[estado] ?? { bg: '#F0F0F0', color: '#666' }
   return (
-    <span style={{
-      background: s.bg, color: s.color, fontSize: '11px', fontWeight: 600,
-      padding: '3px 10px', borderRadius: '20px', textTransform: 'capitalize',
-    }}>
+    <span style={{ background: s.bg, color: s.color, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', textTransform: 'capitalize' }}>
       {estado}
     </span>
   )
@@ -88,76 +157,98 @@ function StatePill({ estado }: { estado: string }) {
 
 // ─── Sección: Resumen ─────────────────────────────────────────────────────────
 
-function SeccionResumen({ onNavigate }: { onNavigate: (s: EmbSection) => void }) {
-  const mgbCoins = BUYERS_MGB.reduce((s, b) => s + b.coins, 0)
+function SeccionResumen({ onNavigate, canjes }: { onNavigate: (s: EmbSection) => void; canjes: Canje[] }) {
+  const isMobile = useMobile()
   return (
     <div>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
         {[
-          { label: 'Mis Coins', value: USUARIO.coins.toLocaleString('es-PE'), icon: '🪙' },
+          { label: 'Mis Coins',            value: TOTAL_COINS.toLocaleString('es-PE'), icon: '🪙' },
           { label: 'Referidos MGM activos', value: REFERIDOS_MGM.filter(r => r.estado === 'activo').length, icon: '📦' },
-          { label: 'New Buyers MGB', value: BUYERS_MGB.length, icon: '🛒' },
-          { label: 'Próximo corte', value: '15 ago', icon: '📅' },
+          { label: 'New Buyers MGB',        value: MGB_STATS.compradores, icon: '🛒' },
+          { label: 'Próximo corte',         value: '15 ago', icon: '📅' },
         ].map((kpi, i) => (
           <div key={i} style={card}>
-            <p style={{ fontSize: '12px', color: '#666', margin: '0 0 8px' }}>{kpi.label}</p>
+            <p style={{ fontSize: '11px', color: '#999', margin: '0 0 8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{kpi.label}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '24px', fontWeight: 800, color: '#333' }}>{kpi.value}</span>
-              <span style={{ fontSize: '18px' }}>{kpi.icon}</span>
+              <span style={{ fontSize: '22px', fontWeight: 800, color: '#333' }}>{kpi.value}</span>
+              <span style={{ fontSize: '16px' }}>{kpi.icon}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Two cards side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         {/* Últimos movimientos */}
         <div style={card}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>
-            Últimos movimientos
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {WALLET_MGM.map((tx, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < WALLET_MGM.length - 1 ? '1px solid #F0F0F0' : 'none' }}>
-                <div>
-                  <p style={{ fontSize: '12px', color: '#333', margin: '0 0 2px' }}>{tx.descripcion}</p>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Últimos movimientos</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {WALLET_TRANSACTIONS.slice(0, 3).map((tx, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: i < 2 ? '1px solid #F5F5F5' : 'none' }}>
+                <div style={{ minWidth: 0, paddingRight: '8px' }}>
+                  <p style={{ fontSize: '12px', color: '#333', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tx.descripcion}</p>
                   <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{tx.fecha}</p>
                 </div>
-                <span style={{ fontWeight: 700, color: '#00A650', fontSize: '13px', whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                  +{tx.coins} 🪙
-                </span>
+                <span style={{ fontWeight: 700, color: '#00A650', fontSize: '13px', whiteSpace: 'nowrap' }}>+{tx.coins} 🪙</span>
               </div>
             ))}
           </div>
-          <button onClick={() => onNavigate('mgm')} style={{ marginTop: '14px', fontSize: '12px', color: '#3483FA', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          <button onClick={() => onNavigate('mgm')} style={{ marginTop: '12px', fontSize: '12px', color: '#3483FA', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             Ver todos →
           </button>
         </div>
 
-        {/* Mis referidos activos */}
+        {/* Referidos activos */}
         <div style={card}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>
-            Mis referidos activos
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {REFERIDOS_MGM.map((r) => (
-              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F0F0F0' }}>
-                <div>
-                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#333', margin: '0 0 3px' }}>{r.negocio}</p>
-                  <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{r.hitos.length}/{HITOS_DEF.length} hitos</p>
-                </div>
-                <StatePill estado={r.estado} />
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Mis referidos activos</p>
+          {REFERIDOS_MGM.map((r) => (
+            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #F5F5F5' }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#333', margin: '0 0 3px' }}>{r.negocio}</p>
+                <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{r.hitos.length}/{HITOS_DEF.length} hitos</p>
               </div>
-            ))}
-          </div>
-          <div style={{ marginTop: '14px', background: '#F9F9F9', borderRadius: '6px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: '#666' }}>Total coins MGM + MGB</span>
-            <span style={{ fontWeight: 700, color: '#333' }}>
-              {(USUARIO.coins + mgbCoins).toLocaleString('es-PE')} 🪙
-            </span>
-          </div>
+              <StatePill estado={r.estado} />
+            </div>
+          ))}
         </div>
+      </div>
+
+      {/* Historial de canjes */}
+      <div style={card}>
+        <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Historial de canjes</p>
+        {canjes.length === 0 ? (
+          <p style={{ fontSize: '13px', color: '#999' }}>
+            Aún no tenés canjes registrados. Tu próximo corte es el <strong>15 de agosto</strong>.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '480px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
+                  {['Premio','Coins','Fecha solicitud','Estado','Entrega estimada'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '0 8px 10px 0', fontSize: '11px', fontWeight: 600, color: '#999' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {canjes.map((c, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #F9F9F9' }}>
+                    <td style={{ padding: '10px 8px 10px 0', fontWeight: 500 }}>{c.premio}</td>
+                    <td style={{ padding: '10px 8px 10px 0', color: '#555' }}>{c.coins} 🪙</td>
+                    <td style={{ padding: '10px 8px 10px 0', color: '#777' }}>{c.fecha}</td>
+                    <td style={{ padding: '10px 8px 10px 0' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px', background: c.estado === 'Entregado' ? '#E8F8EF' : '#FFF8E7', color: c.estado === 'Entregado' ? '#00A650' : '#FF7733' }}>
+                        {c.estado === 'Entregado' ? '🟢' : '🟡'} {c.estado}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 0', color: '#777' }}>{c.entrega}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -169,6 +260,7 @@ type AgregaForm = { negocio: string; ruc: string; mercado: string; telefono: str
 const FORM_INIT: AgregaForm = { negocio: '', ruc: '', mercado: '', telefono: '', contacto: '', notas: '' }
 
 function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) {
+  const isMobile = useMobile()
   const [form, setForm] = useState<AgregaForm>(FORM_INIT)
   const [errors, setErrors] = useState<Partial<AgregaForm>>({})
   const [showModal, setShowModal] = useState(false)
@@ -188,10 +280,7 @@ function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) 
     return Object.keys(e).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (validate()) setShowModal(true) }
-  const handleConfirm = () => { setShowModal(false); setShowSuccess(true) }
-
-  const inputStyle = (hasErr: boolean): React.CSSProperties => ({
+  const inp = (hasErr: boolean): React.CSSProperties => ({
     width: '100%', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', color: '#333',
     border: `1.5px solid ${hasErr ? '#E01D1D' : '#DDD'}`, outline: 'none', boxSizing: 'border-box',
     fontFamily: 'inherit', background: '#fff',
@@ -201,99 +290,52 @@ function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) 
     <div style={{ ...card, maxWidth: '480px', margin: '40px auto', textAlign: 'center', padding: '48px 32px' }}>
       <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#E8F8EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', margin: '0 auto 20px' }}>✅</div>
       <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#333', margin: '0 0 10px' }}>¡Referido enviado!</h2>
-      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 6px' }}>
-        Tu asesor recibirá la info y se contactará con <strong>{form.negocio}</strong>.
-      </p>
-      <p style={{ fontSize: '13px', color: '#999', margin: '0 0 28px' }}>
-        Ganarás tus primeros coins cuando <strong>{form.negocio}</strong> publique 10 productos.
-      </p>
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-        <button onClick={() => { setForm(FORM_INIT); setShowSuccess(false) }} style={{ padding: '10px 20px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', color: '#333' }}>
-          Agregar otro
-        </button>
-        <button onClick={() => onNavigate('mgm')} style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', background: '#FFE600', fontSize: '13px', fontWeight: 700, cursor: 'pointer', color: '#1D1D1B' }}>
-          Ver mis referidos
-        </button>
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 6px' }}>Tu asesor recibirá la info y se contactará con <strong>{form.negocio}</strong>.</p>
+      <p style={{ fontSize: '13px', color: '#999', margin: '0 0 28px' }}>Ganarás tus primeros 100 coins cuando <strong>{form.negocio}</strong> publique 10 productos.</p>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button onClick={() => { setForm(FORM_INIT); setShowSuccess(false) }} style={{ padding: '10px 20px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', color: '#333' }}>Agregar otro</button>
+        <button onClick={() => onNavigate('mgm')} style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', background: '#FFE600', fontSize: '13px', fontWeight: 700, cursor: 'pointer', color: '#1D1D1B' }}>Ver mis referidos</button>
       </div>
     </div>
   )
 
-  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '5px' }
-  const errorStyle: React.CSSProperties = { fontSize: '11px', color: '#E01D1D', marginTop: '3px' }
+  const lbl: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '5px' }
+  const err: React.CSSProperties = { fontSize: '11px', color: '#E01D1D', marginTop: '3px' }
 
   return (
     <div style={{ maxWidth: '720px' }}>
-      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-        Completá los datos del negocio que querés incorporar a MercadoLibre.
-      </p>
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ ...card }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>Completá los datos del negocio que querés incorporar a MercadoLibre.</p>
+      <form onSubmit={(e) => { e.preventDefault(); if (validate()) setShowModal(true) }}>
+        <div style={card}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '18px' }}>
+            <div><label style={lbl}>Nombre del negocio *</label><input style={inp(!!errors.negocio)} value={form.negocio} onChange={F('negocio')} placeholder="Ej: Tienda Tech Lima" />{errors.negocio && <p style={err}>{errors.negocio}</p>}</div>
+            <div><label style={lbl}>RUC / DNI *</label><input style={inp(!!errors.ruc)} value={form.ruc} onChange={F('ruc')} placeholder="8 u 11 dígitos" maxLength={11} />{errors.ruc && <p style={err}>{errors.ruc}</p>}</div>
             <div>
-              <label style={labelStyle}>Nombre del negocio *</label>
-              <input style={inputStyle(!!errors.negocio)} value={form.negocio} onChange={F('negocio')} placeholder="Ej: Tienda Tech Lima" />
-              {errors.negocio && <p style={errorStyle}>{errors.negocio}</p>}
-            </div>
-
-            <div>
-              <label style={labelStyle}>RUC / DNI *</label>
-              <input style={inputStyle(!!errors.ruc)} value={form.ruc} onChange={F('ruc')} placeholder="8 u 11 dígitos" maxLength={11} />
-              {errors.ruc && <p style={errorStyle}>{errors.ruc}</p>}
-            </div>
-
-            <div>
-              <label style={labelStyle}>Mercado donde vende *</label>
-              <select style={inputStyle(!!errors.mercado)} value={form.mercado} onChange={F('mercado')}>
+              <label style={lbl}>Mercado donde vende *</label>
+              <select style={inp(!!errors.mercado)} value={form.mercado} onChange={F('mercado')}>
                 <option value="">Seleccioná...</option>
                 {['Wilson','Polvos Azules','Gamarra','Otro'].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
-              {errors.mercado && <p style={errorStyle}>{errors.mercado}</p>}
+              {errors.mercado && <p style={err}>{errors.mercado}</p>}
             </div>
-
-            <div>
-              <label style={labelStyle}>Teléfono de contacto *</label>
-              <input style={inputStyle(!!errors.telefono)} value={form.telefono} onChange={F('telefono')} placeholder="Ej: 999 888 777" />
-              {errors.telefono && <p style={errorStyle}>{errors.telefono}</p>}
-            </div>
-
-            <div>
-              <label style={labelStyle}>Nombre del contacto *</label>
-              <input style={inputStyle(!!errors.contacto)} value={form.contacto} onChange={F('contacto')} placeholder="Ej: Carlos López" />
-              {errors.contacto && <p style={errorStyle}>{errors.contacto}</p>}
-            </div>
-
-            <div>
-              <label style={labelStyle}>Notas adicionales <span style={{ fontWeight: 400, color: '#999' }}>(opcional)</span></label>
-              <textarea style={{ ...inputStyle(false), resize: 'vertical', minHeight: '38px', fontFamily: 'inherit' }}
-                value={form.notas} onChange={F('notas')} placeholder="Información relevante..." />
-            </div>
+            <div><label style={lbl}>Teléfono de contacto *</label><input style={inp(!!errors.telefono)} value={form.telefono} onChange={F('telefono')} placeholder="Ej: 999 888 777" />{errors.telefono && <p style={err}>{errors.telefono}</p>}</div>
+            <div><label style={lbl}>Nombre del contacto *</label><input style={inp(!!errors.contacto)} value={form.contacto} onChange={F('contacto')} placeholder="Ej: Carlos López" />{errors.contacto && <p style={err}>{errors.contacto}</p>}</div>
+            <div><label style={lbl}>Notas adicionales <span style={{ fontWeight: 400, color: '#999' }}>(opcional)</span></label><textarea style={{ ...inp(false), resize: 'vertical', minHeight: '38px', fontFamily: 'inherit' }} value={form.notas} onChange={F('notas')} placeholder="Información relevante..." /></div>
           </div>
-
           <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" style={{ padding: '11px 28px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#1D1D1B' }}>
-              Enviar referido →
-            </button>
+            <button type="submit" style={{ padding: '11px 28px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#1D1D1B' }}>Enviar referido →</button>
           </div>
         </div>
       </form>
 
-      {/* Modal de confirmación */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '380px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '100%', maxWidth: '380px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 10px' }}>¿Confirmar referido?</h3>
-            <p style={{ fontSize: '14px', color: '#666', margin: '0 0 22px' }}>
-              Vas a referir a <strong>{form.negocio}</strong> al programa de embajadores.
-            </p>
+            <p style={{ fontSize: '14px', color: '#666', margin: '0 0 22px' }}>Vas a referir a <strong>{form.negocio}</strong> al programa.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowModal(false)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                Cancelar
-              </button>
-              <button onClick={handleConfirm} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#FFE600', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#1D1D1B' }}>
-                Confirmar
-              </button>
+              <button onClick={() => setShowModal(false)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancelar</button>
+              <button onClick={() => { setShowModal(false); setShowSuccess(true) }} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#FFE600', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#1D1D1B' }}>Confirmar</button>
             </div>
           </div>
         </div>
@@ -305,34 +347,37 @@ function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) 
 // ─── Sección: Mis Puntos MGM ──────────────────────────────────────────────────
 
 function ProgressTracker({ hitos }: { hitos: string[] }) {
+  const isMobile = useMobile()
   const achieved = new Set(hitos)
   const nextIdx = HITOS_DEF.findIndex(h => !achieved.has(h.id))
   return (
-    <div style={{ position: 'relative', padding: '8px 0 4px' }}>
-      <div style={{ position: 'absolute', top: '22px', left: '20px', right: '20px', height: '2px', background: '#E8E8E8', zIndex: 0 }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
-        {HITOS_DEF.map((h, idx) => {
-          const done = achieved.has(h.id)
-          const isNext = idx === nextIdx
-          return (
-            <div key={h.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '60px' }}>
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '50%', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700,
-                background: done ? '#FFE600' : '#fff',
-                border: done ? '2px solid #FFE600' : isNext ? '2px dashed #FFE600' : '2px solid #E0E0E0',
-                color: done ? '#1D1D1B' : isNext ? '#FFE600' : '#CCC',
-                animation: isNext ? 'pulse 2s infinite' : 'none',
-              }}>
-                {done ? '✓' : idx + 1}
+    <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+      <div style={{ position: 'relative', padding: '8px 0 4px', minWidth: isMobile ? '380px' : 'auto' }}>
+        <div style={{ position: 'absolute', top: '22px', left: '20px', right: '20px', height: '2px', background: '#E8E8E8', zIndex: 0 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+          {HITOS_DEF.map((h, idx) => {
+            const done = achieved.has(h.id)
+            const isNext = idx === nextIdx
+            return (
+              <div key={h.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '60px' }}>
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '12px', fontWeight: 700,
+                  background: done ? '#FFE600' : '#fff',
+                  border: done ? '2px solid #FFE600' : isNext ? '2px dashed #FFE600' : '2px solid #E0E0E0',
+                  color: done ? '#1D1D1B' : isNext ? '#FFE600' : '#CCC',
+                  animation: isNext ? 'pulse 2s infinite' : 'none',
+                }}>
+                  {done ? '✓' : idx + 1}
+                </div>
+                <p style={{ fontSize: '10px', color: done ? '#333' : '#AAA', textAlign: 'center', margin: 0, lineHeight: 1.3 }}>{h.label}</p>
+                <p style={{ fontSize: '10px', fontWeight: 600, color: done ? '#00A650' : '#CCC', margin: 0 }}>+{h.coins}c</p>
               </div>
-              <p style={{ fontSize: '10px', color: done ? '#333' : '#AAA', textAlign: 'center', margin: 0, lineHeight: 1.3 }}>{h.label}</p>
-              <p style={{ fontSize: '10px', fontWeight: 600, color: done ? '#00A650' : '#CCC', margin: 0 }}>+{h.coins}c</p>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
+        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
       </div>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
     </div>
   )
 }
@@ -343,43 +388,34 @@ function SeccionMGM() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>
-          Total ganado por MGM: <strong style={{ color: '#333' }}>{total.toLocaleString('es-PE')} coins 🪙</strong>
-        </p>
-      </div>
-
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 20px' }}>
+        Total ganado por MGM: <strong style={{ color: '#333' }}>{total.toLocaleString('es-PE')} coins 🪙</strong>
+        {' · '}
+        <span style={{ color: '#999', fontSize: '12px' }}>Máximo por seller: 1,500 coins</span>
+      </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {REFERIDOS_MGM.map((r) => (
           <div key={r.id} style={card}>
-            <div
-              onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-            >
+            <div onClick={() => setExpanded(expanded === r.id ? null : r.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
-                  🏪
-                </div>
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>🏪</div>
                 <div>
                   <p style={{ fontWeight: 600, color: '#333', margin: '0 0 3px', fontSize: '14px' }}>{r.negocio}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <StatePill estado={r.estado} />
                     <StatusLegend type="mgm" />
-                    <span style={{ fontSize: '11px', color: '#999' }}>{r.hitos.length}/{HITOS_DEF.length} hitos completados</span>
+                    <span style={{ fontSize: '11px', color: '#999' }}>{r.hitos.length}/{HITOS_DEF.length} hitos</span>
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <span style={{ fontWeight: 700, color: '#333', fontSize: '16px' }}>{r.coins} 🪙</span>
-                <span style={{ fontSize: '18px', color: '#999', transition: 'transform 0.2s', display: 'inline-block', transform: expanded === r.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+                <span style={{ fontSize: '18px', color: '#999', display: 'inline-block', transform: expanded === r.id ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▾</span>
               </div>
             </div>
-
             {expanded === r.id && (
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #F0F0F0' }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#999', margin: '0 0 14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Progreso de hitos
-                </p>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#999', margin: '0 0 14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Progreso de hitos</p>
                 <ProgressTracker hitos={r.hitos} />
               </div>
             )}
@@ -393,37 +429,22 @@ function SeccionMGM() {
 // ─── Sección: Mis Puntos MGB ──────────────────────────────────────────────────
 
 function SeccionMGB() {
+  const isMobile = useMobile()
   const [copied, setCopied] = useState(false)
 
-  const mgbStats = {
-    compradores: BUYERS_MGB.length,
-    nmv: BUYERS_MGB.reduce((s, b) => s + b.nmv, 0),
-    compras: BUYERS_MGB.reduce((s, b) => s + b.compras, 0),
-    coins: BUYERS_MGB.reduce((s, b) => s + b.coins, 0),
-  }
-
   const copy = () => {
-    navigator.clipboard.writeText(`https://www.mercadolibre.com.pe/?ref=${USUARIO.mercado === 'Wilson' ? 'EMBA-JG01' : 'EMBA-XX00'}`)
+    navigator.clipboard.writeText(`https://www.mercadolibre.com.pe/?ref=EMBA-JG01`)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
       .catch(() => {})
   }
 
   return (
     <div style={{ maxWidth: '720px' }}>
-      {/* Cupón card */}
       <div style={{ ...card, marginBottom: '20px', background: 'linear-gradient(135deg, #1D1D1B 0%, #333 100%)', color: '#fff' }}>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
-          Tu cupón exclusivo
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-          <span style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '4px', fontFamily: 'monospace', color: '#FFE600' }}>
-            EMBA-JG01
-          </span>
-          <button onClick={copy} style={{
-            padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-            background: copied ? '#00A650' : '#FFE600', color: copied ? '#fff' : '#1D1D1B',
-            fontWeight: 700, fontSize: '12px', transition: 'all 0.2s',
-          }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Tu cupón exclusivo</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <span style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '4px', fontFamily: 'monospace', color: '#FFE600' }}>EMBA-JG01</span>
+          <button onClick={copy} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: copied ? '#00A650' : '#FFE600', color: copied ? '#fff' : '#1D1D1B', fontWeight: 700, fontSize: '12px', transition: 'all 0.2s' }}>
             {copied ? '✓ Copiado' : '📋 Copiar link'}
           </button>
         </div>
@@ -432,17 +453,16 @@ function SeccionMGB() {
         </p>
       </div>
 
-      {/* Métricas agregadas — sin datos individuales de compradores */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(2, 1fr)', gap: '14px' }}>
         {[
-          { icon: '🛒', label: 'compradores han usado tu cupón', value: mgbStats.compradores },
-          { icon: '💰', label: 'NMV generado',                   value: `S/ ${mgbStats.nmv.toLocaleString('es-PE')}` },
-          { icon: '🔄', label: 'compras totales',                value: mgbStats.compras },
-          { icon: '🪙', label: 'coins ganados por MGB',          value: mgbStats.coins },
+          { icon: '🛒', label: 'compradores han usado tu cupón', value: MGB_STATS.compradores },
+          { icon: '💰', label: 'NMV generado',                   value: `S/ ${MGB_STATS.nmv.toLocaleString('es-PE')}` },
+          { icon: '🔄', label: 'compras totales',                value: MGB_STATS.compras },
+          { icon: '🪙', label: 'coins ganados por MGB',          value: MGB_STATS.coins },
         ].map((s, i) => (
           <div key={i} style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '28px' }}>{s.icon}</span>
+              <span style={{ fontSize: '26px' }}>{s.icon}</span>
               <div>
                 <p style={{ fontSize: '22px', fontWeight: 800, color: '#333', margin: '0 0 2px' }}>{s.value}</p>
                 <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{s.label}</p>
@@ -457,63 +477,73 @@ function SeccionMGB() {
 
 // ─── Sección: Canjear Premios ─────────────────────────────────────────────────
 
-type Premio = typeof PREMIOS[0]
-
-function SeccionPremios() {
+function SeccionPremios({ onCanje }: { onCanje: (c: Canje) => void }) {
+  const isMobile = useMobile()
   const [selectedPrize, setSelectedPrize] = useState<Premio | null>(null)
   const [prizeStep, setPrizeStep] = useState<0|1|2|3>(0)
   const [address, setAddress] = useState('Mercado Wilson, Puesto 520')
 
   const closeModal = () => { setSelectedPrize(null); setPrizeStep(0) }
-  const openModal = (p: Premio) => { setSelectedPrize(p); setPrizeStep(1) }
+  const openModal  = (p: Premio) => { setSelectedPrize(p); setPrizeStep(1) }
+
+  const handleConfirm = () => {
+    if (!selectedPrize) return
+    onCanje({
+      premio: selectedPrize.nombre,
+      coins: selectedPrize.coins,
+      fecha: '15 ago 2026',
+      estado: 'En proceso',
+      entrega: '1–7 sep 2026',
+    })
+    setPrizeStep(3)
+  }
 
   return (
-    <div style={{ maxWidth: '760px' }}>
+    <div>
       {/* Banner */}
-      <div style={{ background: '#FFF8E7', border: '1px solid #FFE600', borderRadius: '8px', padding: '12px 16px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '18px' }}>⚠️</span>
+      <div style={{ background: '#FFF8E7', border: '1px solid #FFE600', borderRadius: '8px', padding: '12px 16px', marginBottom: '24px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+        <span style={{ fontSize: '16px', marginTop: '1px' }}>⚠️</span>
         <p style={{ fontSize: '13px', color: '#333', margin: 0 }}>
           <strong>Próximo corte: 15 de agosto</strong> — el premio se entrega la primera semana de septiembre.
+          <span style={{ color: '#888' }}> {COINS_RATE} Meli Coins ≈ S/ 1 de valor.</span>
         </p>
       </div>
 
-      {/* Premio grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-        {PREMIOS.map((p) => {
-          const canRedeem = USUARIO.coins >= p.coins
-          return (
-            <div key={p.id} style={{ ...card, position: 'relative', border: p.popular ? '2px solid #FFE600' : '1px solid transparent' }}>
-              {p.popular && (
-                <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#FFE600', borderRadius: '20px', padding: '2px 10px', fontSize: '10px', fontWeight: 700, color: '#1D1D1B', whiteSpace: 'nowrap' }}>
-                  ⭐ Más popular
+      {PREMIO_CATEGORIAS.map(({ cat, emoji, items }) => (
+        <div key={cat} style={{ marginBottom: '28px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 700, color: '#1D1D1B', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>{emoji}</span> {cat}
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '12px' }}>
+            {items.map((p) => {
+              const canRedeem = USUARIO.coins >= p.coins
+              return (
+                <div key={p.id} style={{ ...card, display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px' }}>
+                  <div style={{ fontSize: '26px' }}>{p.emoji}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600, color: '#333', fontSize: '13px', margin: '0 0 2px', lineHeight: 1.3 }}>{p.nombre}</p>
+                    <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>{p.coins.toLocaleString('es-PE')} 🪙 · S/ {p.soles}</p>
+                  </div>
+                  <button
+                    disabled={!canRedeem}
+                    onClick={() => canRedeem && openModal(p)}
+                    style={{ width: '100%', padding: '8px 0', borderRadius: '6px', border: 'none', fontWeight: 700, fontSize: '12px', cursor: canRedeem ? 'pointer' : 'not-allowed', background: canRedeem ? '#FFE600' : '#F0F0F0', color: canRedeem ? '#1D1D1B' : '#AAA', transition: 'all 0.15s' }}
+                  >
+                    {canRedeem ? 'Canjear →' : `Faltan ${(p.coins - USUARIO.coins).toLocaleString('es-PE')} 🪙`}
+                  </button>
                 </div>
-              )}
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>{p.emoji}</div>
-              <p style={{ fontWeight: 600, color: '#333', fontSize: '14px', margin: '0 0 4px' }}>{p.nombre}</p>
-              <p style={{ fontSize: '13px', color: '#999', margin: '0 0 14px' }}>{p.coins.toLocaleString('es-PE')} coins</p>
-              <button
-                disabled={!canRedeem}
-                onClick={() => canRedeem && openModal(p)}
-                style={{
-                  width: '100%', padding: '9px 0', borderRadius: '6px', border: 'none',
-                  fontWeight: 700, fontSize: '12px', cursor: canRedeem ? 'pointer' : 'not-allowed',
-                  background: canRedeem ? '#FFE600' : '#F0F0F0', color: canRedeem ? '#1D1D1B' : '#AAA',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {canRedeem ? 'Canjear →' : `Te faltan ${(p.coins - USUARIO.coins).toLocaleString('es-PE')} coins`}
-              </button>
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
 
       {/* Modal 2 pasos */}
       {selectedPrize && prizeStep > 0 && prizeStep < 3 && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '420px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#999' }}>PASO {prizeStep} DE 2</span>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', width: '100%', maxWidth: '420px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '10px', color: '#999', whiteSpace: 'nowrap' }}>PASO {prizeStep} DE 2</span>
               <div style={{ flex: 1, height: '3px', background: '#F0F0F0', borderRadius: '2px' }}>
                 <div style={{ width: prizeStep === 1 ? '50%' : '100%', height: '100%', background: '#FFE600', borderRadius: '2px', transition: 'width 0.3s' }} />
               </div>
@@ -521,18 +551,14 @@ function SeccionPremios() {
 
             {prizeStep === 1 && (
               <>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '14px 0 8px' }}>Confirmar selección</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px' }}>Confirmar selección</h3>
                 <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
                   <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '14px' }}>{selectedPrize.emoji} {selectedPrize.nombre}</p>
-                  <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>Costo: {selectedPrize.coins} coins → te quedarán <strong>{USUARIO.coins - selectedPrize.coins}</strong> coins</p>
+                  <p style={{ margin: '0 0 2px', color: '#666', fontSize: '13px' }}>Costo: {selectedPrize.coins} 🪙 → te quedarán <strong>{(USUARIO.coins - selectedPrize.coins).toLocaleString('es-PE')}</strong> coins</p>
+                  <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>Equivalencia: S/ {selectedPrize.soles} de valor percibido</p>
                 </div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '6px' }}>
-                  ¿Tu dirección de entrega es correcta?
-                </label>
-                <input
-                  value={address} onChange={(e) => setAddress(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1.5px solid #DDD', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '20px' }}
-                />
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '6px' }}>¿Tu dirección de entrega es correcta?</label>
+                <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1.5px solid #DDD', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '20px' }} />
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={closeModal} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancelar</button>
                   <button onClick={() => setPrizeStep(2)} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#FFE600', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#1D1D1B' }}>Continuar →</button>
@@ -542,15 +568,15 @@ function SeccionPremios() {
 
             {prizeStep === 2 && (
               <>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '14px 0 8px' }}>Confirmación final</h3>
-                <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px' }}>Confirmación final</h3>
+                <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
                   <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{selectedPrize.emoji} {selectedPrize.nombre}</p>
                   <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>📍 {address}</p>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>📅 Entrega estimada: 1-7 de septiembre de 2026</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>📅 Entrega estimada: 1–7 de septiembre de 2026</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setPrizeStep(1)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>← Atrás</button>
-                  <button onClick={() => setPrizeStep(3)} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#00A650', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff' }}>Confirmar canje</button>
+                  <button onClick={handleConfirm} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#00A650', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff' }}>Confirmar canje</button>
                 </div>
               </>
             )}
@@ -558,18 +584,13 @@ function SeccionPremios() {
         </div>
       )}
 
-      {/* Success */}
       {prizeStep === 3 && selectedPrize && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '36px 32px', width: '380px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '36px 28px', width: '100%', maxWidth: '380px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#E8F8EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', margin: '0 auto 16px' }}>✅</div>
             <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 10px' }}>¡Canje registrado!</h3>
-            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 24px' }}>
-              Recibirás tu <strong>{selectedPrize.nombre}</strong> la primera semana de septiembre.
-            </p>
-            <button onClick={closeModal} style={{ padding: '10px 24px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#1D1D1B' }}>
-              Entendido
-            </button>
+            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 24px' }}>Recibirás tu <strong>{selectedPrize.nombre}</strong> la primera semana de septiembre.</p>
+            <button onClick={closeModal} style={{ padding: '10px 24px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#1D1D1B' }}>Entendido</button>
           </div>
         </div>
       )}
@@ -581,8 +602,10 @@ function SeccionPremios() {
 
 export default function Embajador() {
   const [activeSection, setActiveSection] = useState<EmbSection>('resumen')
+  const [canjes, setCanjes] = useState<Canje[]>([DEMO_CANJE])
 
-  const navigate = (s: EmbSection) => setActiveSection(s)
+  const nav = (s: EmbSection) => setActiveSection(s)
+  const addCanje = (c: Canje) => setCanjes(prev => [c, ...prev])
 
   return (
     <Layout
@@ -593,13 +616,14 @@ export default function Embajador() {
       userName={USUARIO.nombre}
       userSub={USUARIO.mercado}
       pageTitle={SECTION_TITLES[activeSection]}
-      coins={USUARIO.coins}
+      coins={TOTAL_COINS}
     >
-      {activeSection === 'resumen' && <SeccionResumen onNavigate={navigate} />}
-      {activeSection === 'agrega'  && <SeccionAgrega onNavigate={navigate} />}
-      {activeSection === 'mgm'     && <SeccionMGM />}
-      {activeSection === 'mgb'     && <SeccionMGB />}
-      {activeSection === 'premios' && <SeccionPremios />}
+      {activeSection === 'resumen'    && <SeccionResumen onNavigate={nav} canjes={canjes} />}
+      {activeSection === 'como-ganar' && <ComoGanar onGoToPremios={() => nav('premios')} />}
+      {activeSection === 'agrega'     && <SeccionAgrega onNavigate={nav} />}
+      {activeSection === 'mgm'        && <SeccionMGM />}
+      {activeSection === 'mgb'        && <SeccionMGB />}
+      {activeSection === 'premios'    && <SeccionPremios onCanje={addCanje} />}
     </Layout>
   )
 }

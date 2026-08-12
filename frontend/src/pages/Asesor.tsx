@@ -1,22 +1,26 @@
 import { useState } from 'react'
 import Layout, { type NavItem } from '../components/Layout'
 import StatusLegend from '../components/StatusLegend'
+import ComoGanar from '../components/ComoGanar'
+import { useMobile } from '../contexts/MobileContext'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-type AsesorSection = 'resumen' | 'referidos-nuevos' | 'embajadores'
+type AsesorSection = 'resumen' | 'como-funciona' | 'referidos-nuevos' | 'embajadores'
 
 // ─── Datos hardcodeados ───────────────────────────────────────────────────────
 
+const TOTAL_COINS_EMB001 = 725  // MGM 550 + MGB 175
+
 const EMBAJADORES_DATA = [
-  { id: 'EMB001', nombre: 'Jose Garcia',  iniciales: 'JG', mercado: 'Wilson',        coins: 520, referidosMGM: 2, buyersMGB: 2, estado: 'Activo' },
+  { id: 'EMB001', nombre: 'Jose Garcia',  iniciales: 'JG', mercado: 'Wilson',        coins: TOTAL_COINS_EMB001, referidosMGM: 2, buyersMGB: 2, estado: 'Activo' },
   { id: 'EMB002', nombre: 'Maria Quispe', iniciales: 'MQ', mercado: 'Polvos Azules', coins: 195, referidosMGM: 1, buyersMGB: 1, estado: 'Activo' },
 ]
 
 const REFERIDOS_MGM_POR_EMB: Record<string, { negocio: string; estado: string; hitos: number; coins: number }[]> = {
   EMB001: [
-    { negocio: 'Tienda Tech Lima', estado: 'activo',   hitos: 4, coins: 585 },
-    { negocio: 'Moda y Mas',       estado: 'validado', hitos: 1, coins: 130 },
+    { negocio: 'Tienda Tech Lima', estado: 'activo',   hitos: 3, coins: 450 },
+    { negocio: 'Moda y Mas',       estado: 'validado', hitos: 1, coins: 100 },
   ],
   EMB002: [
     { negocio: 'Electro Norte', estado: 'pendiente', hitos: 0, coins: 0 },
@@ -24,7 +28,7 @@ const REFERIDOS_MGM_POR_EMB: Record<string, { negocio: string; estado: string; h
 }
 
 const MGB_STATS_POR_EMB: Record<string, { compradores: number; nmv: number; compras: number; coins: number; barData: number[] }> = {
-  EMB001: { compradores: 2, nmv: 539, compras: 4, coins: 260, barData: [1, 1, 2, 0] },
+  EMB001: { compradores: 2, nmv: 539, compras: 4, coins: 175, barData: [1, 1, 2, 0] },
   EMB002: { compradores: 1, nmv: 210, compras: 2, coins: 130, barData: [0, 1, 1, 0] },
 }
 
@@ -48,12 +52,14 @@ const ESTADO_PILL_STYLE: Record<string, { bg: string; color: string }> = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'resumen',          emoji: '🏠', label: 'Resumen' },
+  { id: 'como-funciona',    emoji: '❓', label: 'Cómo funciona' },
   { id: 'referidos-nuevos', emoji: '🔔', label: 'Referidos Nuevos' },
   { id: 'embajadores',      emoji: '👥', label: 'Mis Embajadores' },
 ]
 
 const SECTION_TITLES: Record<AsesorSection, string> = {
   'resumen':          'Resumen',
+  'como-funciona':    'Cómo funciona',
   'referidos-nuevos': 'Referidos Nuevos',
   'embajadores':      'Mis Embajadores',
 }
@@ -94,13 +100,14 @@ function BarChart({ data }: { data: number[] }) {
 // ─── Sección: Resumen ─────────────────────────────────────────────────────────
 
 function SeccionResumen() {
+  const isMobile = useMobile()
   const totalCoins = EMBAJADORES_DATA.reduce((s, e) => s + e.coins, 0)
   const topEmb = [...EMBAJADORES_DATA].sort((a, b) => b.coins - a.coins)
 
   return (
     <div>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
         {[
           { label: 'Embajadores activos',          value: EMBAJADORES_DATA.length, icon: '👥' },
           { label: 'Referidos sin trabajar',        value: REFERIDOS_NUEVOS_INIT.length, icon: '🔔' },
@@ -394,6 +401,7 @@ export default function Asesor() {
       pageTitle={SECTION_TITLES[activeSection]}
     >
       {activeSection === 'resumen'          && <SeccionResumen />}
+      {activeSection === 'como-funciona'    && <ComoGanar />}
       {activeSection === 'referidos-nuevos' && <SeccionReferidosNuevos />}
       {activeSection === 'embajadores'      && <SeccionEmbajadores />}
     </Layout>
