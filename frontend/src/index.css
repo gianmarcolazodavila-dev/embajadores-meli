@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+*, *::before, *::after { box-sizing: border-box; }
+
 body {
   margin: 0;
+  font-family: 'Proxima Nova', system-ui, -apple-system, sans-serif;
+  background: #F5F5F5;
+  color: #333333;
 }
+
+/* Smooth scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 3px; }

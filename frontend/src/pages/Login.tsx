@@ -4,48 +4,71 @@ export default function Login() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-[#FFE600] flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div style={{
+      minHeight: '100vh', background: '#1D1D1B',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+    }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
 
-        {/* Logo + título */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-900 rounded-2xl mb-5">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-                fill="#FFE600" stroke="#FFE600" strokeWidth="1.5" strokeLinejoin="round"
-              />
-            </svg>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '64px', height: '64px', background: '#FFE600', borderRadius: '16px',
+            marginBottom: '20px', fontSize: '28px',
+          }}>
+            ⭐
           </div>
-          <h1 className="text-3xl font-black text-gray-900">Embajadores</h1>
-          <p className="text-lg font-bold text-gray-900">Mercado Libre</p>
-          <p className="text-sm text-gray-600 mt-2">Seleccioná tu vista para el demo</p>
+          <h1 style={{ color: '#fff', fontSize: '28px', fontWeight: 700, margin: '0 0 6px' }}>
+            Embajadores
+          </h1>
+          <p style={{ color: '#FFE600', fontSize: '16px', fontWeight: 600, margin: '0 0 8px' }}>
+            Mercado Libre · Perú
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', margin: 0 }}>
+            Seleccioná tu vista para continuar
+          </p>
         </div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Role cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <button
             onClick={() => navigate('/embajador')}
-            className="bg-white hover:bg-gray-50 rounded-2xl p-6 text-left shadow-sm hover:shadow-md transition-all group"
+            style={{
+              background: '#FFE600', borderRadius: '12px', padding: '24px 20px',
+              textAlign: 'left', border: 'none', cursor: 'pointer',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+              boxShadow: '0 2px 12px rgba(255,230,0,0.25)',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 20px rgba(255,230,0,0.35)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(255,230,0,0.25)' }}
           >
-            <div className="text-3xl mb-3">🛍️</div>
-            <p className="font-bold text-gray-900 text-base leading-tight">Vista Embajador</p>
-            <p className="text-xs text-gray-400 mt-1">Dashboard personal</p>
-            <div className="mt-4 text-xs font-semibold text-[#3483FA] group-hover:underline">
-              Ingresar →
-            </div>
+            <div style={{ fontSize: '28px', marginBottom: '10px' }}>🛍️</div>
+            <p style={{ fontWeight: 700, color: '#1D1D1B', fontSize: '14px', margin: '0 0 4px' }}>
+              Vista Embajador
+            </p>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: '11px', margin: 0 }}>
+              Dashboard personal
+            </p>
           </button>
 
           <button
             onClick={() => navigate('/asesor')}
-            className="bg-gray-900 hover:bg-gray-800 rounded-2xl p-6 text-left shadow-sm hover:shadow-md transition-all group"
+            style={{
+              background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px 20px',
+              textAlign: 'left', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+              transition: 'transform 0.15s, background 0.15s',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.13)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)' }}
           >
-            <div className="text-3xl mb-3">📊</div>
-            <p className="font-bold text-white text-base leading-tight">Vista Asesor</p>
-            <p className="text-xs text-gray-400 mt-1">Panel de gestión</p>
-            <div className="mt-4 text-xs font-semibold text-[#FFE600] group-hover:underline">
-              Ingresar →
-            </div>
+            <div style={{ fontSize: '28px', marginBottom: '10px' }}>📊</div>
+            <p style={{ fontWeight: 700, color: '#fff', fontSize: '14px', margin: '0 0 4px' }}>
+              Vista Asesor
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.40)', fontSize: '11px', margin: 0 }}>
+              Panel de gestión
+            </p>
           </button>
         </div>
 

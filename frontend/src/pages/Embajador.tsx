@@ -1,454 +1,612 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, formatCoinLabel, type Embajador, type ReferidoMGM, type WalletTx } from '../services/api'
+import { useState } from 'react'
+import Layout, { type NavItem } from '../components/Layout'
 
-// ─── Fallback demo data ───────────────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
-const DEMO_EMBAJADOR: Embajador = {
-  ambassador_id: 'EMB001', nombre: 'Jose Garcia', mercado: 'Wilson',
-  coins: 520, coupon_mgb: 'EMBA-JG01', status: 'activo',
-}
+type EmbSection = 'resumen' | 'agrega' | 'mgm' | 'mgb' | 'premios'
 
-const DEMO_REFERIDOS: ReferidoMGM[] = [
-  { referral_id: 'REF001', business_name: 'Tienda Tech Lima', ambassador_id: 'EMB001', status: 'activo',   created_at: '2026-05-12' },
-  { referral_id: 'REF002', business_name: 'Moda y Mas',       ambassador_id: 'EMB001', status: 'validado', created_at: '2026-05-14' },
+// ─── Datos hardcodeados ───────────────────────────────────────────────────────
+
+const USUARIO = { nombre: 'Jose Garcia', mercado: 'Wilson', coins: 520 }
+
+const WALLET_MGM = [
+  { descripcion: '📦 30 productos publicados · Tienda Tech Lima', coins: 260, fecha: '2026-08-12' },
+  { descripcion: '🎉 Primera venta realizada · Tienda Tech Lima', coins: 195, fecha: '2026-08-11' },
+  { descripcion: '📦 10 productos publicados · Tienda Tech Lima', coins: 130, fecha: '2026-08-10' },
 ]
 
-const DEMO_WALLET: WalletTx[] = [
-  { tx_id: 'W001', ambassador_id: 'EMB001', descripcion: 'Hito: catalogo_30 - Tienda Tech Lima',   coins: 260, created_at: '2026-08-12' },
-  { tx_id: 'W002', ambassador_id: 'EMB001', descripcion: 'Hito: primera_venta - Tienda Tech Lima', coins: 195, created_at: '2026-08-11' },
-  { tx_id: 'W003', ambassador_id: 'EMB001', descripcion: 'Hito: catalogo_10 - Tienda Tech Lima',   coins: 130, created_at: '2026-08-10' },
+const REFERIDOS_MGM = [
+  { id: 'REF001', negocio: 'Tienda Tech Lima', estado: 'activo',   coins: 585, hitos: ['catalogo_10','catalogo_30','primera_venta','seller_desarrollo'] },
+  { id: 'REF002', negocio: 'Moda y Mas',       estado: 'validado', coins: 130, hitos: ['catalogo_10'] },
 ]
 
-// ─── Hardcoded MGB (no está en la API aún) ───────────────────────────────────
-
-const DEMO_MGB = {
-  referidos: [
-    { id: 'BUYER001', nombre: 'Ana Torres',   compras: 3, total_nmv: 450, ultima_compra: '2026-08-10', coins_generados: 195 },
-    { id: 'BUYER002', nombre: 'Luis Mendoza', compras: 1, total_nmv: 89,  ultima_compra: '2026-08-08', coins_generados: 65 },
-  ],
-  wallet_mgb: [
-    { descripcion: '🛒 Primera compra realizada · Ana Torres',   coins: 65,  fecha: '2026-08-08' },
-    { descripcion: '🔄 3 compras completadas · Ana Torres',      coins: 130, fecha: '2026-08-10' },
-    { descripcion: '🛒 Primera compra realizada · Luis Mendoza', coins: 65,  fecha: '2026-08-08' },
-  ],
-}
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const HITO_LABELS: Record<string, string> = {
-  catalogo_10:       '10 pub.',
-  catalogo_30:       '30 pub.',
-  catalogo_100:      '100 pub.',
-  primera_venta:     '1ª venta',
-  seller_desarrollo: 'Desarro.',
-  seller_activado:   'Activado',
-}
-
-const HITO_ORDER = ['catalogo_10', 'catalogo_30', 'catalogo_100', 'primera_venta', 'seller_desarrollo', 'seller_activado']
-
-const ESTADO_STYLES: Record<string, string> = {
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  validado:  'bg-blue-100 text-blue-800',
-  activo:    'bg-green-100 text-green-800',
-  rechazado: 'bg-red-100 text-red-700',
-}
-
-const PRIZES = [
-  { name: 'Gift card S/30',  coins: 300 },
-  { name: 'Gift card S/50',  coins: 500 },
-  { name: 'Audífonos',       coins: 1500 },
-  { name: 'Sesión de fotos', coins: 1500 },
-  { name: 'Smartwatch',      coins: 4000 },
-  { name: 'Smartphone',      coins: 10000 },
+const BUYERS_MGB = [
+  { nombre: 'Ana Torres',   compras: 3, nmv: 450, coins: 195, estado: 'Recurrente', estadoColor: '#00A650' },
+  { nombre: 'Luis Mendoza', compras: 1, nmv: 89,  coins: 65,  estado: 'Nuevo',      estadoColor: '#3483FA' },
 ]
 
-const GUIDE_MGM = [
-  { hito: '10 productos en catálogo',                         coins: 130, icon: '📦' },
-  { hito: '30 productos en catálogo',                         coins: 260, icon: '📦' },
-  { hito: '100 productos en catálogo',                        coins: 390, icon: '📦' },
-  { hito: 'Primera venta',                                    coins: 195, icon: '🎉' },
-  { hito: 'Seller en desarrollo (10 ventas + S/.1,000 NMV)',  coins: 390, icon: '📈' },
-  { hito: 'Seller activado (25 ventas + S/.3,000 NMV)',       coins: 585, icon: '⭐' },
+const HITOS_DEF = [
+  { id: 'catalogo_10',       label: '10 productos', coins: 130 },
+  { id: 'catalogo_30',       label: '30 productos', coins: 260 },
+  { id: 'catalogo_100',      label: '100 productos', coins: 390 },
+  { id: 'primera_venta',     label: 'Primera venta', coins: 195 },
+  { id: 'seller_desarrollo', label: 'En desarrollo', coins: 390 },
+  { id: 'seller_activado',   label: 'Activado', coins: 585 },
 ]
 
-const GUIDE_MGB = [
-  { hito: 'Primera compra del comprador',     coins: 65,  icon: '🛒' },
-  { hito: '3 compras completadas',            coins: 130, icon: '🔄' },
-  { hito: 'Comprador recurrente (5+ compras)', coins: 195, icon: '🏆' },
+const PREMIOS = [
+  { id: 'polo',    emoji: '🎽', nombre: 'Polo Mercado Libre',    coins: 200, popular: false },
+  { id: 'gorra',   emoji: '🧢', nombre: 'Gorra MELI',           coins: 150, popular: false },
+  { id: 'mochila', emoji: '🎒', nombre: 'Mochila Oficial',       coins: 400, popular: false },
+  { id: 'credito', emoji: '📱', nombre: 'Crédito S/50 en MELI', coins: 300, popular: true },
+  { id: 'bolsas',  emoji: '🛍️', nombre: 'Bolsas de tela (x5)',  coins: 100, popular: false },
+  { id: 'kit',     emoji: '🏆', nombre: 'Kit Embajador Premium', coins: 600, popular: false },
 ]
 
-type Tab = 'mgm' | 'mgb' | 'guia'
-
-const TAB_LABELS: Record<Tab, string> = {
-  mgm:  'MGM (Vendedores)',
-  mgb:  'MGB (Compradores)',
-  guia: 'Cómo ganar coins',
+const ESTADO_PILL: Record<string, { bg: string; color: string }> = {
+  activo:   { bg: '#E8F8EF', color: '#00A650' },
+  validado: { bg: '#EBF1FF', color: '#3483FA' },
+  pendiente:{ bg: '#FFF8E7', color: '#FF7733' },
+  rechazado:{ bg: '#FFECEC', color: '#E01D1D' },
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+const NAV_ITEMS: NavItem[] = [
+  { id: 'resumen', emoji: '🏠', label: 'Resumen' },
+  { id: 'agrega',  emoji: '➕', label: 'Agrega un Negocio' },
+  { id: 'mgm',     emoji: '📦', label: 'Mis Puntos MGM' },
+  { id: 'mgb',     emoji: '🛒', label: 'Mis Puntos MGB' },
+  { id: 'premios', emoji: '🎁', label: 'Canjear Premios' },
+]
 
-function diasRestantes(createdAt: string): number {
-  const diff = Date.now() - new Date(createdAt).getTime()
-  const elapsed = Math.floor(diff / 86_400_000)
-  return Math.max(0, 90 - elapsed)
+const SECTION_TITLES: Record<EmbSection, string> = {
+  resumen: 'Resumen',
+  agrega:  'Agrega un Negocio',
+  mgm:     'Mis Puntos MGM',
+  mgb:     'Mis Puntos MGB',
+  premios: 'Canjear Premios',
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Helpers de estilo ────────────────────────────────────────────────────────
 
-export default function Embajador() {
-  const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('mgm')
+const card: React.CSSProperties = {
+  background: '#fff', borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px',
+}
+
+function StatePill({ estado }: { estado: string }) {
+  const s = ESTADO_PILL[estado] ?? { bg: '#F0F0F0', color: '#666' }
+  return (
+    <span style={{
+      background: s.bg, color: s.color, fontSize: '11px', fontWeight: 600,
+      padding: '3px 10px', borderRadius: '20px', textTransform: 'capitalize',
+    }}>
+      {estado}
+    </span>
+  )
+}
+
+// ─── Sección: Resumen ─────────────────────────────────────────────────────────
+
+function SeccionResumen({ onNavigate }: { onNavigate: (s: EmbSection) => void }) {
+  const mgbCoins = BUYERS_MGB.reduce((s, b) => s + b.coins, 0)
+  return (
+    <div>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        {[
+          { label: 'Mis Coins', value: USUARIO.coins.toLocaleString('es-PE'), icon: '🪙' },
+          { label: 'Referidos MGM activos', value: REFERIDOS_MGM.filter(r => r.estado === 'activo').length, icon: '📦' },
+          { label: 'New Buyers MGB', value: BUYERS_MGB.length, icon: '🛒' },
+          { label: 'Próximo corte', value: '15 ago', icon: '📅' },
+        ].map((kpi, i) => (
+          <div key={i} style={card}>
+            <p style={{ fontSize: '12px', color: '#666', margin: '0 0 8px' }}>{kpi.label}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '24px', fontWeight: 800, color: '#333' }}>{kpi.value}</span>
+              <span style={{ fontSize: '18px' }}>{kpi.icon}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Two cards side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        {/* Últimos movimientos */}
+        <div style={card}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>
+            Últimos movimientos
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {WALLET_MGM.map((tx, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < WALLET_MGM.length - 1 ? '1px solid #F0F0F0' : 'none' }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: '#333', margin: '0 0 2px' }}>{tx.descripcion}</p>
+                  <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{tx.fecha}</p>
+                </div>
+                <span style={{ fontWeight: 700, color: '#00A650', fontSize: '13px', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                  +{tx.coins} 🪙
+                </span>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => onNavigate('mgm')} style={{ marginTop: '14px', fontSize: '12px', color: '#3483FA', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            Ver todos →
+          </button>
+        </div>
+
+        {/* Mis referidos activos */}
+        <div style={card}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>
+            Mis referidos activos
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {REFERIDOS_MGM.map((r) => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F0F0F0' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#333', margin: '0 0 3px' }}>{r.negocio}</p>
+                  <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{r.hitos.length}/{HITOS_DEF.length} hitos</p>
+                </div>
+                <StatePill estado={r.estado} />
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '14px', background: '#F9F9F9', borderRadius: '6px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#666' }}>Total coins MGM + MGB</span>
+            <span style={{ fontWeight: 700, color: '#333' }}>
+              {(USUARIO.coins + mgbCoins).toLocaleString('es-PE')} 🪙
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sección: Agrega un Negocio ───────────────────────────────────────────────
+
+type AgregaForm = { negocio: string; ruc: string; mercado: string; telefono: string; contacto: string; notas: string }
+const FORM_INIT: AgregaForm = { negocio: '', ruc: '', mercado: '', telefono: '', contacto: '', notas: '' }
+
+function SeccionAgrega({ onNavigate }: { onNavigate: (s: EmbSection) => void }) {
+  const [form, setForm] = useState<AgregaForm>(FORM_INIT)
+  const [errors, setErrors] = useState<Partial<AgregaForm>>({})
+  const [showModal, setShowModal] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
+
+  const F = (k: keyof AgregaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const validate = () => {
+    const e: Partial<AgregaForm> = {}
+    if (!form.negocio.trim()) e.negocio = 'Requerido'
+    if (!/^\d{8}$|^\d{11}$/.test(form.ruc.trim())) e.ruc = 'Debe ser 8 u 11 dígitos'
+    if (!form.mercado) e.mercado = 'Requerido'
+    if (!form.telefono.trim()) e.telefono = 'Requerido'
+    if (!form.contacto.trim()) e.contacto = 'Requerido'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (validate()) setShowModal(true) }
+  const handleConfirm = () => { setShowModal(false); setShowSuccess(true) }
+
+  const inputStyle = (hasErr: boolean): React.CSSProperties => ({
+    width: '100%', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', color: '#333',
+    border: `1.5px solid ${hasErr ? '#E01D1D' : '#DDD'}`, outline: 'none', boxSizing: 'border-box',
+    fontFamily: 'inherit', background: '#fff',
+  })
+
+  if (showSuccess) return (
+    <div style={{ ...card, maxWidth: '480px', margin: '40px auto', textAlign: 'center', padding: '48px 32px' }}>
+      <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#E8F8EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', margin: '0 auto 20px' }}>✅</div>
+      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#333', margin: '0 0 10px' }}>¡Referido enviado!</h2>
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 6px' }}>
+        Tu asesor recibirá la info y se contactará con <strong>{form.negocio}</strong>.
+      </p>
+      <p style={{ fontSize: '13px', color: '#999', margin: '0 0 28px' }}>
+        Ganarás tus primeros coins cuando <strong>{form.negocio}</strong> publique 10 productos.
+      </p>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <button onClick={() => { setForm(FORM_INIT); setShowSuccess(false) }} style={{ padding: '10px 20px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', color: '#333' }}>
+          Agregar otro
+        </button>
+        <button onClick={() => onNavigate('mgm')} style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', background: '#FFE600', fontSize: '13px', fontWeight: 700, cursor: 'pointer', color: '#1D1D1B' }}>
+          Ver mis referidos
+        </button>
+      </div>
+    </div>
+  )
+
+  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '5px' }
+  const errorStyle: React.CSSProperties = { fontSize: '11px', color: '#E01D1D', marginTop: '3px' }
+
+  return (
+    <div style={{ maxWidth: '720px' }}>
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
+        Completá los datos del negocio que querés incorporar a MercadoLibre.
+      </p>
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ ...card }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+            <div>
+              <label style={labelStyle}>Nombre del negocio *</label>
+              <input style={inputStyle(!!errors.negocio)} value={form.negocio} onChange={F('negocio')} placeholder="Ej: Tienda Tech Lima" />
+              {errors.negocio && <p style={errorStyle}>{errors.negocio}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>RUC / DNI *</label>
+              <input style={inputStyle(!!errors.ruc)} value={form.ruc} onChange={F('ruc')} placeholder="8 u 11 dígitos" maxLength={11} />
+              {errors.ruc && <p style={errorStyle}>{errors.ruc}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Mercado donde vende *</label>
+              <select style={inputStyle(!!errors.mercado)} value={form.mercado} onChange={F('mercado')}>
+                <option value="">Seleccioná...</option>
+                {['Wilson','Polvos Azules','Gamarra','Otro'].map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              {errors.mercado && <p style={errorStyle}>{errors.mercado}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Teléfono de contacto *</label>
+              <input style={inputStyle(!!errors.telefono)} value={form.telefono} onChange={F('telefono')} placeholder="Ej: 999 888 777" />
+              {errors.telefono && <p style={errorStyle}>{errors.telefono}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Nombre del contacto *</label>
+              <input style={inputStyle(!!errors.contacto)} value={form.contacto} onChange={F('contacto')} placeholder="Ej: Carlos López" />
+              {errors.contacto && <p style={errorStyle}>{errors.contacto}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Notas adicionales <span style={{ fontWeight: 400, color: '#999' }}>(opcional)</span></label>
+              <textarea style={{ ...inputStyle(false), resize: 'vertical', minHeight: '38px', fontFamily: 'inherit' }}
+                value={form.notas} onChange={F('notas')} placeholder="Información relevante..." />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" style={{ padding: '11px 28px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', color: '#1D1D1B' }}>
+              Enviar referido →
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {/* Modal de confirmación */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '380px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 10px' }}>¿Confirmar referido?</h3>
+            <p style={{ fontSize: '14px', color: '#666', margin: '0 0 22px' }}>
+              Vas a referir a <strong>{form.negocio}</strong> al programa de embajadores.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                Cancelar
+              </button>
+              <button onClick={handleConfirm} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#FFE600', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#1D1D1B' }}>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Sección: Mis Puntos MGM ──────────────────────────────────────────────────
+
+function ProgressTracker({ hitos }: { hitos: string[] }) {
+  const achieved = new Set(hitos)
+  const nextIdx = HITOS_DEF.findIndex(h => !achieved.has(h.id))
+  return (
+    <div style={{ position: 'relative', padding: '8px 0 4px' }}>
+      <div style={{ position: 'absolute', top: '22px', left: '20px', right: '20px', height: '2px', background: '#E8E8E8', zIndex: 0 }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+        {HITOS_DEF.map((h, idx) => {
+          const done = achieved.has(h.id)
+          const isNext = idx === nextIdx
+          return (
+            <div key={h.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '60px' }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '50%', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700,
+                background: done ? '#FFE600' : '#fff',
+                border: done ? '2px solid #FFE600' : isNext ? '2px dashed #FFE600' : '2px solid #E0E0E0',
+                color: done ? '#1D1D1B' : isNext ? '#FFE600' : '#CCC',
+                animation: isNext ? 'pulse 2s infinite' : 'none',
+              }}>
+                {done ? '✓' : idx + 1}
+              </div>
+              <p style={{ fontSize: '10px', color: done ? '#333' : '#AAA', textAlign: 'center', margin: 0, lineHeight: 1.3 }}>{h.label}</p>
+              <p style={{ fontSize: '10px', fontWeight: 600, color: done ? '#00A650' : '#CCC', margin: 0 }}>+{h.coins}c</p>
+            </div>
+          )
+        })}
+      </div>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
+    </div>
+  )
+}
+
+function SeccionMGM() {
+  const [expanded, setExpanded] = useState<string | null>('REF001')
+  const total = REFERIDOS_MGM.reduce((s, r) => s + r.coins, 0)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>
+          Total ganado por MGM: <strong style={{ color: '#333' }}>{total.toLocaleString('es-PE')} coins 🪙</strong>
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {REFERIDOS_MGM.map((r) => (
+          <div key={r.id} style={card}>
+            <div
+              onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                  🏪
+                </div>
+                <div>
+                  <p style={{ fontWeight: 600, color: '#333', margin: '0 0 3px', fontSize: '14px' }}>{r.negocio}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <StatePill estado={r.estado} />
+                    <span style={{ fontSize: '11px', color: '#999' }}>{r.hitos.length}/{HITOS_DEF.length} hitos completados</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontWeight: 700, color: '#333', fontSize: '16px' }}>{r.coins} 🪙</span>
+                <span style={{ fontSize: '18px', color: '#999', transition: 'transform 0.2s', display: 'inline-block', transform: expanded === r.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+              </div>
+            </div>
+
+            {expanded === r.id && (
+              <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #F0F0F0' }}>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#999', margin: '0 0 14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Progreso de hitos
+                </p>
+                <ProgressTracker hitos={r.hitos} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Sección: Mis Puntos MGB ──────────────────────────────────────────────────
+
+function SeccionMGB() {
   const [copied, setCopied] = useState(false)
+  const totalCoins = BUYERS_MGB.reduce((s, b) => s + b.coins, 0)
 
-  const [embajador, setEmbajador] = useState<Embajador>(DEMO_EMBAJADOR)
-  const [referidos, setReferidos] = useState<ReferidoMGM[]>(DEMO_REFERIDOS)
-  const [wallet, setWallet]       = useState<WalletTx[]>(DEMO_WALLET)
-  const [loading, setLoading]     = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      api.getEmbajador('EMB001'),
-      api.getReferidosMGM('EMB001'),
-      api.getWallet('EMB001'),
-    ])
-      .then(([emb, refs, txs]) => {
-        setEmbajador(emb)
-        setReferidos(refs)
-        setWallet(txs)
-      })
-      .catch(() => { /* fallo silencioso — se usa demo data */ })
-      .finally(() => setLoading(false))
-  }, [])
-
-  const copyLink = () => {
-    navigator.clipboard
-      .writeText(`https://www.mercadolibre.com.pe/?ref=${embajador.coupon_mgb}`)
+  const copy = () => {
+    navigator.clipboard.writeText(`https://www.mercadolibre.com.pe/?ref=${USUARIO.mercado === 'Wilson' ? 'EMBA-JG01' : 'EMBA-XX00'}`)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
       .catch(() => {})
   }
 
-  const totalCoinsMGB = DEMO_MGB.referidos.reduce((s, r) => s + r.coins_generados, 0)
-
-  // Wallet combinada: MGM real + MGB hardcoded, ordenadas por fecha
-  const walletCombinada = [
-    ...wallet.map((tx) => ({ descripcion: formatCoinLabel(tx.descripcion), coins: tx.coins, fecha: tx.created_at })),
-    ...DEMO_MGB.wallet_mgb,
-  ].sort((a, b) => b.fecha.localeCompare(a.fecha))
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block w-10 h-10 border-4 border-[#3483FA] border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm text-gray-400">Cargando tu dashboard…</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-
-      {/* Header */}
-      <header className="bg-[#FFE600] px-6 py-4 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900">Hola, {embajador.nombre}</h1>
-            <span className="bg-gray-900 text-[#FFE600] text-xs font-semibold px-3 py-1 rounded-full">
-              {embajador.mercado}
-            </span>
-          </div>
-          <button
-            onClick={() => navigate('/login')}
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 underline underline-offset-2"
-          >
-            Salir
+    <div style={{ maxWidth: '720px' }}>
+      {/* Cupón card */}
+      <div style={{ ...card, marginBottom: '20px', background: 'linear-gradient(135deg, #1D1D1B 0%, #333 100%)', color: '#fff' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+          Tu cupón exclusivo
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <span style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '4px', fontFamily: 'monospace', color: '#FFE600' }}>
+            EMBA-JG01
+          </span>
+          <button onClick={copy} style={{
+            padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+            background: copied ? '#00A650' : '#FFE600', color: copied ? '#fff' : '#1D1D1B',
+            fontWeight: 700, fontSize: '12px', transition: 'all 0.2s',
+          }}>
+            {copied ? '✓ Copiado' : '📋 Copiar link'}
           </button>
         </div>
-      </header>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.60)', margin: 0 }}>
+          Compartí este código con compradores. Cuando lo usen en su primera compra en MercadoLibre, ambos ganan.
+        </p>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-
-        {/* Wallet (siempre visible) */}
-        <section className="bg-white rounded-2xl shadow-sm p-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-            Mis Meli Coins
-          </h2>
-          <div className="flex items-end gap-2 mb-1">
-            <span className="text-6xl font-black text-[#3483FA] leading-none">
-              {embajador.coins.toLocaleString('es-PE')}
-            </span>
-            <span className="text-xl text-gray-400 mb-1">coins</span>
-          </div>
-          <p className="text-sm text-gray-400 mb-6">
-            ≈ S/ {(embajador.coins / 10).toLocaleString('es-PE', { minimumFractionDigits: 2 })} de valor referencial
-          </p>
-
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            Últimas transacciones
-          </h3>
-          <div className="overflow-x-auto -mx-2">
-            <table className="w-full text-sm min-w-[380px]">
-              <thead>
-                <tr className="text-left text-gray-400 border-b border-gray-100">
-                  <th className="pb-2 pl-2 font-medium w-28">Fecha</th>
-                  <th className="pb-2 font-medium">Descripción</th>
-                  <th className="pb-2 pr-2 font-medium text-right w-20">Coins</th>
-                </tr>
-              </thead>
-              <tbody>
-                {walletCombinada.map((tx, i) => (
-                  <tr key={i} className="border-b border-gray-50 last:border-0">
-                    <td className="py-2.5 pl-2 text-gray-400 whitespace-nowrap">{tx.fecha}</td>
-                    <td className="py-2.5 text-gray-700 pr-4">{tx.descripcion}</td>
-                    <td className="py-2.5 pr-2 text-right font-semibold text-green-600">
-                      +{tx.coins}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab ? 'bg-[#3483FA] text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {TAB_LABELS[tab]}
-            </button>
-          ))}
+      {/* Tabla compradores */}
+      <div style={card}>
+        <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 16px' }}>
+          Actividad de compradores
+        </p>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
+              {['Comprador','Compras realizadas','NMV generado','Coins ganados','Estado'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '0 0 10px', fontSize: '11px', fontWeight: 600, color: '#999', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {BUYERS_MGB.map((b, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #F9F9F9' }}>
+                <td style={{ padding: '12px 0', fontWeight: 500 }}>{b.nombre}</td>
+                <td style={{ padding: '12px 12px 12px 0', color: '#555' }}>{b.compras} compras</td>
+                <td style={{ padding: '12px 12px 12px 0', color: '#555' }}>S/ {b.nmv.toLocaleString('es-PE')}</td>
+                <td style={{ padding: '12px 12px 12px 0', fontWeight: 700, color: '#00A650' }}>+{b.coins} 🪙</td>
+                <td style={{ padding: '12px 0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: b.estadoColor }}>
+                    {b.estado === 'Recurrente' ? '🟢' : '🔵'} {b.estado}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ marginTop: '16px', background: '#F9F9F9', borderRadius: '6px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '13px', color: '#555', fontWeight: 500 }}>Total ganado por MGB</span>
+          <span style={{ fontWeight: 800, color: '#333', fontSize: '16px' }}>{totalCoins} coins 🪙</span>
         </div>
+      </div>
+    </div>
+  )
+}
 
-        {/* Tab: MGM */}
-        {activeTab === 'mgm' && (
-          <>
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                Mis referidos MGM
-              </h2>
-              {referidos.length === 0 ? (
-                <p className="text-sm text-gray-400">
-                  Aún no tenés referidos. Hablá con tu asesor para registrar tu primer negocio.
-                </p>
-              ) : (
-                <div className="overflow-x-auto -mx-2">
-                  <table className="w-full text-sm min-w-[480px]">
-                    <thead>
-                      <tr className="text-left text-gray-400 border-b border-gray-100">
-                        <th className="pb-2 pl-2 font-medium">Negocio</th>
-                        <th className="pb-2 font-medium">Estado</th>
-                        <th className="pb-2 font-medium text-center w-24">Días rest.</th>
-                        <th className="pb-2 pr-2 font-medium">Hitos</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {referidos.map((r) => (
-                        <tr key={r.referral_id} className="border-b border-gray-50 last:border-0">
-                          <td className="py-3 pl-2 pr-4 font-semibold text-gray-900">{r.business_name}</td>
-                          <td className="py-3 pr-4">
-                            <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${ESTADO_STYLES[r.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                              {r.status}
-                            </span>
-                          </td>
-                          <td className="py-3 text-center text-gray-500">{diasRestantes(r.created_at)}d</td>
-                          <td className="py-3 pr-2">
-                            <div className="flex gap-1">
-                              {HITO_ORDER.map((tipo) => (
-                                <div
-                                  key={tipo}
-                                  title={HITO_LABELS[tipo]}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-100 text-gray-300"
-                                >
-                                  ○
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+// ─── Sección: Canjear Premios ─────────────────────────────────────────────────
+
+type Premio = typeof PREMIOS[0]
+
+function SeccionPremios() {
+  const [selectedPrize, setSelectedPrize] = useState<Premio | null>(null)
+  const [prizeStep, setPrizeStep] = useState<0|1|2|3>(0)
+  const [address, setAddress] = useState('Mercado Wilson, Puesto 520')
+
+  const closeModal = () => { setSelectedPrize(null); setPrizeStep(0) }
+  const openModal = (p: Premio) => { setSelectedPrize(p); setPrizeStep(1) }
+
+  return (
+    <div style={{ maxWidth: '760px' }}>
+      {/* Banner */}
+      <div style={{ background: '#FFF8E7', border: '1px solid #FFE600', borderRadius: '8px', padding: '12px 16px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '18px' }}>⚠️</span>
+        <p style={{ fontSize: '13px', color: '#333', margin: 0 }}>
+          <strong>Próximo corte: 15 de agosto</strong> — el premio se entrega la primera semana de septiembre.
+        </p>
+      </div>
+
+      {/* Premio grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+        {PREMIOS.map((p) => {
+          const canRedeem = USUARIO.coins >= p.coins
+          return (
+            <div key={p.id} style={{ ...card, position: 'relative', border: p.popular ? '2px solid #FFE600' : '1px solid transparent' }}>
+              {p.popular && (
+                <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#FFE600', borderRadius: '20px', padding: '2px 10px', fontSize: '10px', fontWeight: 700, color: '#1D1D1B', whiteSpace: 'nowrap' }}>
+                  ⭐ Más popular
                 </div>
               )}
-            </section>
+              <div style={{ fontSize: '32px', marginBottom: '10px' }}>{p.emoji}</div>
+              <p style={{ fontWeight: 600, color: '#333', fontSize: '14px', margin: '0 0 4px' }}>{p.nombre}</p>
+              <p style={{ fontSize: '13px', color: '#999', margin: '0 0 14px' }}>{p.coins.toLocaleString('es-PE')} coins</p>
+              <button
+                disabled={!canRedeem}
+                onClick={() => canRedeem && openModal(p)}
+                style={{
+                  width: '100%', padding: '9px 0', borderRadius: '6px', border: 'none',
+                  fontWeight: 700, fontSize: '12px', cursor: canRedeem ? 'pointer' : 'not-allowed',
+                  background: canRedeem ? '#FFE600' : '#F0F0F0', color: canRedeem ? '#1D1D1B' : '#AAA',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {canRedeem ? 'Canjear →' : `Te faltan ${(p.coins - USUARIO.coins).toLocaleString('es-PE')} coins`}
+              </button>
+            </div>
+          )
+        })}
+      </div>
 
-            {/* Catálogo de premios */}
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                Catálogo de premios
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {PRIZES.map((prize) => {
-                  const canRedeem = embajador.coins >= prize.coins
-                  return (
-                    <div key={prize.name} className="border border-gray-100 rounded-xl p-4 flex flex-col gap-3">
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900 text-sm">{prize.name}</p>
-                        <p className="text-xs text-gray-400 mt-1">{prize.coins.toLocaleString('es-PE')} coins</p>
-                      </div>
-                      <button
-                        disabled={!canRedeem}
-                        onClick={() => alert('Contactá a tu asesor para gestionar el canje.')}
-                        className={`w-full text-xs font-semibold px-3 py-2 rounded-lg transition-colors ${
-                          canRedeem
-                            ? 'bg-green-500 hover:bg-green-600 text-white cursor-pointer'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        {canRedeem
-                          ? 'Canjear'
-                          : `Te faltan ${(prize.coins - embajador.coins).toLocaleString('es-PE')} coins`}
-                      </button>
-                    </div>
-                  )
-                })}
+      {/* Modal 2 pasos */}
+      {selectedPrize && prizeStep > 0 && prizeStep < 3 && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '420px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#999' }}>PASO {prizeStep} DE 2</span>
+              <div style={{ flex: 1, height: '3px', background: '#F0F0F0', borderRadius: '2px' }}>
+                <div style={{ width: prizeStep === 1 ? '50%' : '100%', height: '100%', background: '#FFE600', borderRadius: '2px', transition: 'width 0.3s' }} />
               </div>
-            </section>
-          </>
-        )}
+            </div>
 
-        {/* Tab: MGB */}
-        {activeTab === 'mgb' && (
-          <>
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                Mi cupón MGB
-              </h2>
-              <div className="flex flex-wrap items-center gap-4 mb-5">
-                <span className="text-4xl font-black tracking-widest text-gray-900 font-mono">
-                  {embajador.coupon_mgb}
-                </span>
-                <button
-                  onClick={copyLink}
-                  className="bg-[#3483FA] hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors"
-                >
-                  {copied ? '¡Copiado!' : 'Copiar link'}
-                </button>
-              </div>
-              <div className="flex gap-8 text-sm text-gray-500">
-                <div>
-                  <span className="text-2xl font-black text-gray-900">{DEMO_MGB.referidos.length}</span>
-                  <span className="ml-1.5">compradores referidos</span>
+            {prizeStep === 1 && (
+              <>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '14px 0 8px' }}>Confirmar selección</h3>
+                <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
+                  <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '14px' }}>{selectedPrize.emoji} {selectedPrize.nombre}</p>
+                  <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>Costo: {selectedPrize.coins} coins → te quedarán <strong>{USUARIO.coins - selectedPrize.coins}</strong> coins</p>
                 </div>
-                <div>
-                  <span className="text-2xl font-black text-[#3483FA]">{totalCoinsMGB}</span>
-                  <span className="ml-1.5">coins ganados por MGB</span>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '6px' }}>
+                  ¿Tu dirección de entrega es correcta?
+                </label>
+                <input
+                  value={address} onChange={(e) => setAddress(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1.5px solid #DDD', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '20px' }}
+                />
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={closeModal} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancelar</button>
+                  <button onClick={() => setPrizeStep(2)} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#FFE600', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#1D1D1B' }}>Continuar →</button>
                 </div>
-              </div>
-            </section>
+              </>
+            )}
 
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-                Compradores referidos
-              </h2>
-              <div className="overflow-x-auto -mx-2">
-                <table className="w-full text-sm min-w-[480px]">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-100">
-                      <th className="pb-2 pl-2 font-medium">Comprador</th>
-                      <th className="pb-2 font-medium text-center">Compras</th>
-                      <th className="pb-2 font-medium text-right">NMV (S/)</th>
-                      <th className="pb-2 font-medium">Última compra</th>
-                      <th className="pb-2 pr-2 font-medium text-right">Coins gen.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEMO_MGB.referidos.map((r) => (
-                      <tr key={r.id} className="border-b border-gray-50 last:border-0">
-                        <td className="py-3 pl-2 font-semibold text-gray-900">{r.nombre}</td>
-                        <td className="py-3 text-center text-gray-600">{r.compras}</td>
-                        <td className="py-3 text-right text-gray-600">S/ {r.total_nmv.toLocaleString('es-PE')}</td>
-                        <td className="py-3 text-gray-500">{r.ultima_compra}</td>
-                        <td className="py-3 pr-2 text-right font-semibold text-green-600">+{r.coins_generados}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                Transacciones MGB
-              </h2>
-              <div className="overflow-x-auto -mx-2">
-                <table className="w-full text-sm min-w-[380px]">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-100">
-                      <th className="pb-2 pl-2 font-medium w-28">Fecha</th>
-                      <th className="pb-2 font-medium">Descripción</th>
-                      <th className="pb-2 pr-2 font-medium text-right w-20">Coins</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEMO_MGB.wallet_mgb.map((tx, i) => (
-                      <tr key={i} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2.5 pl-2 text-gray-400 whitespace-nowrap">{tx.fecha}</td>
-                        <td className="py-2.5 text-gray-700 pr-4">{tx.descripcion}</td>
-                        <td className="py-2.5 pr-2 text-right font-semibold text-green-600">+{tx.coins}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* Tab: Cómo ganar coins */}
-        {activeTab === 'guia' && (
-          <div className="space-y-6">
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Referís a un Vendedor (MGM)</h2>
-              <p className="text-sm text-gray-400 mb-4">
-                Cuando un negocio que referiste alcanza estos hitos en Mercado Libre, ganás coins automáticamente.
-              </p>
-              <div className="space-y-2">
-                {GUIDE_MGM.map((item) => (
-                  <div key={item.hito} className="flex items-center justify-between border-l-4 border-[#FFE600] bg-gray-50 rounded-r-xl px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{item.icon}</span>
-                      <span className="text-sm text-gray-700">{item.hito}</span>
-                    </div>
-                    <span className="text-sm font-black text-[#3483FA] whitespace-nowrap ml-4">+{item.coins} coins</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Referís a un Comprador (MGB)</h2>
-              <p className="text-sm text-gray-400 mb-4">
-                Compartí tu cupón con compradores. Ganás coins cuando compran en Mercado Libre.
-              </p>
-              <div className="space-y-2">
-                {GUIDE_MGB.map((item) => (
-                  <div key={item.hito} className="flex items-center justify-between border-l-4 border-[#FFE600] bg-gray-50 rounded-r-xl px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{item.icon}</span>
-                      <span className="text-sm text-gray-700">{item.hito}</span>
-                    </div>
-                    <span className="text-sm font-black text-[#3483FA] whitespace-nowrap ml-4">+{item.coins} coins</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <p className="text-xs text-gray-400 text-center pb-2">
-              ⏰ Los coins se acreditan automáticamente cada día a las 3am.
-            </p>
+            {prizeStep === 2 && (
+              <>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '14px 0 8px' }}>Confirmación final</h3>
+                <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
+                  <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{selectedPrize.emoji} {selectedPrize.nombre}</p>
+                  <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>📍 {address}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>📅 Entrega estimada: 1-7 de septiembre de 2026</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setPrizeStep(1)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>← Atrás</button>
+                  <button onClick={() => setPrizeStep(3)} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#00A650', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff' }}>Confirmar canje</button>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-      </main>
+      {/* Success */}
+      {prizeStep === 3 && selectedPrize && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '36px 32px', width: '380px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#E8F8EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', margin: '0 auto 16px' }}>✅</div>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 10px' }}>¡Canje registrado!</h3>
+            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 24px' }}>
+              Recibirás tu <strong>{selectedPrize.nombre}</strong> la primera semana de septiembre.
+            </p>
+            <button onClick={closeModal} style={{ padding: '10px 24px', background: '#FFE600', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#1D1D1B' }}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
+export default function Embajador() {
+  const [activeSection, setActiveSection] = useState<EmbSection>('resumen')
+
+  const navigate = (s: EmbSection) => setActiveSection(s)
+
+  return (
+    <Layout
+      role="embajador"
+      navItems={NAV_ITEMS}
+      activeSection={activeSection}
+      onNavigate={(id) => setActiveSection(id as EmbSection)}
+      userName={USUARIO.nombre}
+      userSub={USUARIO.mercado}
+      pageTitle={SECTION_TITLES[activeSection]}
+      coins={USUARIO.coins}
+    >
+      {activeSection === 'resumen' && <SeccionResumen onNavigate={navigate} />}
+      {activeSection === 'agrega'  && <SeccionAgrega onNavigate={navigate} />}
+      {activeSection === 'mgm'     && <SeccionMGM />}
+      {activeSection === 'mgb'     && <SeccionMGB />}
+      {activeSection === 'premios' && <SeccionPremios />}
+    </Layout>
   )
 }

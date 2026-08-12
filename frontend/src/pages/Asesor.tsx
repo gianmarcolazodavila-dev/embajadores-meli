@@ -1,246 +1,396 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, type Embajador } from '../services/api'
+import { useState } from 'react'
+import Layout, { type NavItem } from '../components/Layout'
 
-// ─── Fallback demo data ───────────────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
-const DEMO_EMBAJADORES: Embajador[] = [
-  { ambassador_id: 'EMB001', nombre: 'Jose Garcia',  mercado: 'Wilson',        coins: 520, coupon_mgb: 'EMBA-JG01', status: 'activo' },
-  { ambassador_id: 'EMB002', nombre: 'Maria Quispe', mercado: 'Polvos Azules', coins: 195, coupon_mgb: 'EMBA-MQ02', status: 'activo' },
+type AsesorSection = 'resumen' | 'referidos-nuevos' | 'embajadores'
+
+// ─── Datos hardcodeados ───────────────────────────────────────────────────────
+
+const EMBAJADORES_DATA = [
+  { id: 'EMB001', nombre: 'Jose Garcia',  iniciales: 'JG', mercado: 'Wilson',        coins: 520, referidosMGM: 2, buyersMGB: 2, estado: 'Activo' },
+  { id: 'EMB002', nombre: 'Maria Quispe', iniciales: 'MQ', mercado: 'Polvos Azules', coins: 195, referidosMGM: 1, buyersMGB: 1, estado: 'Activo' },
 ]
 
-const REFERIDOS = [
-  { negocio: 'Tienda Tech Lima', ruc: '20123456789', embajador: 'Jose Garcia',  estado: 'activo',    dias: 90, hitos: 3 },
-  { negocio: 'Moda y Mas',       ruc: '20987654321', embajador: 'Jose Garcia',  estado: 'validado',  dias: 88, hitos: 1 },
-  { negocio: 'Electro Norte',    ruc: '20456789123', embajador: 'Maria Quispe', estado: 'pendiente', dias: 90, hitos: 0 },
+const REFERIDOS_MGM_POR_EMB: Record<string, { negocio: string; estado: string; hitos: number; coins: number }[]> = {
+  EMB001: [
+    { negocio: 'Tienda Tech Lima', estado: 'activo',   hitos: 4, coins: 585 },
+    { negocio: 'Moda y Mas',       estado: 'validado', hitos: 1, coins: 130 },
+  ],
+  EMB002: [
+    { negocio: 'Electro Norte', estado: 'pendiente', hitos: 0, coins: 0 },
+  ],
+}
+
+const MGB_STATS_POR_EMB: Record<string, { compradores: number; nmv: number; compras: number; coins: number; barData: number[] }> = {
+  EMB001: { compradores: 2, nmv: 539, compras: 4, coins: 260, barData: [1, 1, 2, 0] },
+  EMB002: { compradores: 1, nmv: 210, compras: 2, coins: 130, barData: [0, 1, 1, 0] },
+}
+
+const REFERIDOS_NUEVOS_INIT = [
+  { id: 'NR001', negocio: 'Electro Norte', ruc: '20456789123', mercado: 'Polvos Azules', embajador: 'Maria Quispe', fecha: '10 ago 2026' },
 ]
 
-const REFERIDOS_MGB = [
-  { buyer: 'Ana Torres',   embajador: 'Jose Garcia',  compras: 3, total_nmv: 450, coins_gen: 195, estado: 'recurrente' },
-  { buyer: 'Luis Mendoza', embajador: 'Jose Garcia',  compras: 1, total_nmv: 89,  coins_gen: 65,  estado: 'nuevo' },
-  { buyer: 'Carmen Diaz',  embajador: 'Maria Quispe', compras: 2, total_nmv: 210, coins_gen: 130, estado: 'activo' },
+const ACTIVIDAD_RECIENTE = [
+  { evento: 'Hito completado · seller_desarrollo',    embajador: 'Jose Garcia',  ts: 'Hace 2h',  icon: '📈' },
+  { evento: 'Referido creado · Electro Norte',        embajador: 'Maria Quispe', ts: 'Hace 5h',  icon: '➕' },
+  { evento: 'Coins emitidos · +260 coins',            embajador: 'Jose Garcia',  ts: 'Hace 1d',  icon: '🪙' },
+  { evento: 'Hito completado · primera_venta',        embajador: 'Jose Garcia',  ts: 'Hace 2d',  icon: '🎉' },
+  { evento: 'Referido creado · Moda y Mas',           embajador: 'Jose Garcia',  ts: 'Hace 3d',  icon: '➕' },
 ]
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const MERCADO_STYLES: Record<string, string> = {
-  'Wilson':         'bg-blue-100 text-blue-800',
-  'Polvos Azules':  'bg-sky-100 text-sky-700',
-  'Polvos Rosados': 'bg-pink-100 text-pink-800',
+const ESTADO_PILL_STYLE: Record<string, { bg: string; color: string }> = {
+  activo:   { bg: '#E8F8EF', color: '#00A650' },
+  validado: { bg: '#EBF1FF', color: '#3483FA' },
+  pendiente:{ bg: '#FFF8E7', color: '#FF7733' },
 }
 
-const ESTADO_MGM_STYLES: Record<string, string> = {
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  validado:  'bg-blue-100 text-blue-800',
-  activo:    'bg-green-100 text-green-800',
-  rechazado: 'bg-red-100 text-red-700',
+const NAV_ITEMS: NavItem[] = [
+  { id: 'resumen',          emoji: '🏠', label: 'Resumen' },
+  { id: 'referidos-nuevos', emoji: '🔔', label: 'Referidos Nuevos' },
+  { id: 'embajadores',      emoji: '👥', label: 'Mis Embajadores' },
+]
+
+const SECTION_TITLES: Record<AsesorSection, string> = {
+  'resumen':          'Resumen',
+  'referidos-nuevos': 'Referidos Nuevos',
+  'embajadores':      'Mis Embajadores',
 }
 
-const ESTADO_MGB_STYLES: Record<string, string> = {
-  recurrente: 'bg-green-100 text-green-800',
-  activo:     'bg-blue-100 text-blue-800',
-  nuevo:      'bg-gray-100 text-gray-600',
+// ─── Estilos base ─────────────────────────────────────────────────────────────
+
+const card: React.CSSProperties = {
+  background: '#fff', borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px',
 }
 
-const HITO_TOTAL = 6
-
-type Tab = 'embajadores' | 'mgm' | 'mgb'
-
-const TAB_LABELS: Record<Tab, string> = {
-  embajadores: 'Embajadores',
-  mgm:         'Referidos MGM',
-  mgb:         'Referidos MGB',
+function Pill({ estado }: { estado: string }) {
+  const s = ESTADO_PILL_STYLE[estado] ?? { bg: '#F0F0F0', color: '#666' }
+  return (
+    <span style={{ background: s.bg, color: s.color, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', textTransform: 'capitalize' }}>
+      {estado}
+    </span>
+  )
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Mini bar chart ───────────────────────────────────────────────────────────
 
-export default function Asesor() {
-  const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('embajadores')
-  const [embajadores, setEmbajadores] = useState<Embajador[]>(DEMO_EMBAJADORES)
-  const [loading, setLoading] = useState(true)
+function BarChart({ data }: { data: number[] }) {
+  const max = Math.max(...data, 1)
+  const weeks = ['S1', 'S2', 'S3', 'S4']
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '56px', paddingBottom: '18px', position: 'relative' }}>
+      {data.map((val, i) => (
+        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+          <div style={{ width: '100%', background: val > 0 ? '#FFE600' : '#F0F0F0', borderRadius: '3px 3px 0 0', height: `${val > 0 ? Math.max((val / max) * 38, 6) : 4}px`, transition: 'height 0.3s' }} />
+          <span style={{ fontSize: '10px', color: '#AAA', marginTop: '4px', position: 'absolute', bottom: 0 }}>{weeks[i]}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
-  useEffect(() => {
-    api.getEmbajadores()
-      .then(setEmbajadores)
-      .catch(() => { /* fallo silencioso — se usa demo data */ })
-      .finally(() => setLoading(false))
-  }, [])
+// ─── Sección: Resumen ─────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block w-10 h-10 border-4 border-[#3483FA] border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm text-gray-400">Cargando…</p>
+function SeccionResumen() {
+  const totalCoins = EMBAJADORES_DATA.reduce((s, e) => s + e.coins, 0)
+  const topEmb = [...EMBAJADORES_DATA].sort((a, b) => b.coins - a.coins)
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+        {[
+          { label: 'Embajadores activos',          value: EMBAJADORES_DATA.length, icon: '👥' },
+          { label: 'Referidos sin trabajar',        value: REFERIDOS_NUEVOS_INIT.length, icon: '🔔' },
+          { label: 'Total coins emitidos',          value: `${totalCoins.toLocaleString('es-PE')} 🪙`, icon: '' },
+          { label: 'Referidos activos',             value: 3, icon: '📦' },
+        ].map((kpi, i) => (
+          <div key={i} style={card}>
+            <p style={{ fontSize: '11px', color: '#999', margin: '0 0 8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{kpi.label}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '22px', fontWeight: 800, color: '#333' }}>{kpi.value}</span>
+              {kpi.icon && <span style={{ fontSize: '16px' }}>{kpi.icon}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '16px' }}>
+        {/* Actividad reciente */}
+        <div style={card}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Actividad reciente</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {ACTIVIDAD_RECIENTE.map((a, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: i < ACTIVIDAD_RECIENTE.length - 1 ? '1px solid #F5F5F5' : 'none' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>{a.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: '#333', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.evento}</p>
+                  <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{a.embajador}</p>
+                </div>
+                <span style={{ fontSize: '11px', color: '#CCC', flexShrink: 0 }}>{a.ts}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Top Embajadores */}
+        <div style={card}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#333', margin: '0 0 14px' }}>Top Embajadores</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {topEmb.map((emb, i) => (
+              <div key={emb.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: '#F9F9F9', borderRadius: '8px' }}>
+                <span style={{ fontSize: '14px', color: i === 0 ? '#FFE600' : '#CCC', fontWeight: 700 }}>#{i + 1}</span>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#FFE600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px', color: '#1D1D1B', flexShrink: 0 }}>
+                  {emb.iniciales}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emb.nombre}</p>
+                  <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{emb.referidosMGM} referidos</p>
+                </div>
+                <span style={{ fontWeight: 700, color: '#333', fontSize: '13px', whiteSpace: 'nowrap' }}>{emb.coins} 🪙</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    )
+    </div>
+  )
+}
+
+// ─── Sección: Referidos Nuevos ────────────────────────────────────────────────
+
+function SeccionReferidosNuevos() {
+  const [referidos, setReferidos] = useState(REFERIDOS_NUEVOS_INIT)
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
+
+  const handleConfirm = () => {
+    if (!pendingId) return
+    setRemoving(pendingId)
+    setTimeout(() => {
+      setReferidos(prev => prev.filter(r => r.id !== pendingId))
+      setRemoving(null)
+      setPendingId(null)
+    }, 350)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ maxWidth: '900px' }}>
+      <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
+        Estos negocios fueron enviados por tus embajadores y aún no han sido trabajados.
+      </p>
 
-      {/* Header */}
-      <header className="bg-[#FFE600] px-6 py-4 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Panel Asesor</h1>
-          <button
-            onClick={() => navigate('/login')}
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 underline underline-offset-2"
-          >
-            Salir
-          </button>
+      {referidos.length === 0 ? (
+        <div style={{ ...card, textAlign: 'center', padding: '56px 32px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#333', margin: '0 0 8px' }}>¡Todo al día!</h3>
+          <p style={{ fontSize: '14px', color: '#999', margin: 0 }}>No hay referidos pendientes de contacto.</p>
         </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto px-4 py-8">
-
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white rounded-xl p-1 shadow-sm w-fit overflow-x-auto">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab ? 'bg-[#3483FA] text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {TAB_LABELS[tab]}
-            </button>
-          ))}
+      ) : (
+        <div style={card}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
+                {['Negocio','RUC','Mercado','Embajador','Fecha recibido','Acción'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '0 12px 12px 0', fontSize: '11px', fontWeight: 600, color: '#999', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {referidos.map((r) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #F9F9F9', opacity: removing === r.id ? 0 : 1, transition: 'opacity 0.3s' }}>
+                  <td style={{ padding: '14px 12px 14px 0', fontWeight: 600 }}>{r.negocio}</td>
+                  <td style={{ padding: '14px 12px 14px 0', fontFamily: 'monospace', fontSize: '12px', color: '#666' }}>{r.ruc}</td>
+                  <td style={{ padding: '14px 12px 14px 0', color: '#555' }}>{r.mercado}</td>
+                  <td style={{ padding: '14px 12px 14px 0', color: '#555' }}>{r.embajador}</td>
+                  <td style={{ padding: '14px 12px 14px 0', color: '#999' }}>{r.fecha}</td>
+                  <td style={{ padding: '14px 0' }}>
+                    <button
+                      onClick={() => setPendingId(r.id)}
+                      style={{ padding: '7px 14px', borderRadius: '6px', border: '1.5px solid #3483FA', background: '#fff', color: '#3483FA', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Marcar contactado
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* Tab: Embajadores */}
-        {activeTab === 'embajadores' && (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">Embajadores ({embajadores.length})</h2>
+      {pendingId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '360px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 10px' }}>¿Confirmar contacto?</h3>
+            <p style={{ fontSize: '14px', color: '#666', margin: '0 0 22px' }}>
+              Se marcará <strong>{referidos.find(r => r.id === pendingId)?.negocio}</strong> como contactado y saldrá de la lista.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setPendingId(null)} style={{ padding: '9px 18px', borderRadius: '6px', border: '1.5px solid #DDD', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancelar</button>
+              <button onClick={handleConfirm} style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#00A650', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff' }}>Confirmar</button>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[520px]">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-100">
-                      <th className="py-3 pl-6 font-medium">Nombre</th>
-                      <th className="py-3 font-medium">Mercado</th>
-                      <th className="py-3 font-medium">Coins</th>
-                      <th className="py-3 pr-6 font-medium">Cupón</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {embajadores.map((emb) => (
-                      <tr key={emb.ambassador_id} className="border-b border-gray-50 last:border-0">
-                        <td className="py-3 pl-6">
-                          <p className="font-semibold text-gray-900">{emb.nombre}</p>
-                          <p className="text-xs text-gray-400">{emb.ambassador_id}</p>
-                        </td>
-                        <td className="py-3">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${MERCADO_STYLES[emb.mercado] ?? 'bg-gray-100 text-gray-600'}`}>
-                            {emb.mercado}
-                          </span>
-                        </td>
-                        <td className="py-3 font-semibold text-[#3483FA]">
-                          {emb.coins.toLocaleString('es-PE')}
-                        </td>
-                        <td className="py-3 pr-6 font-mono text-gray-700">{emb.coupon_mgb}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Tab: Referidos MGM */}
-        {activeTab === 'mgm' && (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">Referidos MGM ({REFERIDOS.length})</h2>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[580px]">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-100">
-                      <th className="py-3 pl-6 font-medium">Negocio</th>
-                      <th className="py-3 font-medium">RUC</th>
-                      <th className="py-3 font-medium">Embajador</th>
-                      <th className="py-3 font-medium">Estado</th>
-                      <th className="py-3 font-medium text-center">Días rest.</th>
-                      <th className="py-3 pr-6 font-medium text-center">Hitos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {REFERIDOS.map((r, i) => (
-                      <tr key={i} className="border-b border-gray-50 last:border-0">
-                        <td className="py-3 pl-6 font-semibold text-gray-900">{r.negocio}</td>
-                        <td className="py-3 font-mono text-gray-500 text-xs">{r.ruc}</td>
-                        <td className="py-3 text-gray-600">{r.embajador}</td>
-                        <td className="py-3">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${ESTADO_MGM_STYLES[r.estado] ?? ''}`}>
-                            {r.estado}
-                          </span>
-                        </td>
-                        <td className="py-3 text-center text-gray-500">{r.dias}d</td>
-                        <td className="py-3 pr-6 text-center">
-                          <span className="text-xs font-semibold text-gray-600">{r.hitos}/{HITO_TOTAL}</span>
-                          <div className="mt-1 bg-gray-100 rounded-full h-1.5 mx-auto max-w-[48px]">
-                            <div className="bg-[#3483FA] h-1.5 rounded-full" style={{ width: `${(r.hitos / HITO_TOTAL) * 100}%` }} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Tab: Referidos MGB */}
-        {activeTab === 'mgb' && (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">Referidos MGB ({REFERIDOS_MGB.length})</h2>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[560px]">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-gray-100">
-                      <th className="py-3 pl-6 font-medium">Comprador</th>
-                      <th className="py-3 font-medium">Embajador</th>
-                      <th className="py-3 font-medium text-center">Compras</th>
-                      <th className="py-3 font-medium text-right">NMV (S/)</th>
-                      <th className="py-3 font-medium text-right">Coins gen.</th>
-                      <th className="py-3 pr-6 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {REFERIDOS_MGB.map((r, i) => (
-                      <tr key={i} className="border-b border-gray-50 last:border-0">
-                        <td className="py-3 pl-6 font-semibold text-gray-900">{r.buyer}</td>
-                        <td className="py-3 text-gray-600">{r.embajador}</td>
-                        <td className="py-3 text-center text-gray-600">{r.compras}</td>
-                        <td className="py-3 text-right text-gray-600">S/ {r.total_nmv.toLocaleString('es-PE')}</td>
-                        <td className="py-3 text-right font-semibold text-green-600">+{r.coins_gen}</td>
-                        <td className="py-3 pr-6">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${ESTADO_MGB_STYLES[r.estado] ?? ''}`}>
-                            {r.estado}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-      </div>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+// ─── Sección: Mis Embajadores ─────────────────────────────────────────────────
+
+function SeccionEmbajadores() {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState<'mgm' | 'mgb'>('mgm')
+
+  const toggleExpand = (id: string) => {
+    if (expandedId === id) { setExpandedId(null) }
+    else { setExpandedId(id); setDetailTab('mgm') }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '800px' }}>
+      {EMBAJADORES_DATA.map((emb) => {
+        const isExpanded = expandedId === emb.id
+        const mgmData = REFERIDOS_MGM_POR_EMB[emb.id] ?? []
+        const mgbData = MGB_STATS_POR_EMB[emb.id]
+
+        return (
+          <div key={emb.id}>
+            {/* Card embajador */}
+            <div style={{ ...card, cursor: 'default' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FFE600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '15px', color: '#1D1D1B', flexShrink: 0 }}>
+                  {emb.iniciales}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <p style={{ fontWeight: 700, fontSize: '15px', color: '#333', margin: 0 }}>{emb.nombre}</p>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#00A650' }}>🟢 {emb.estado}</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>{emb.mercado}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '24px', textAlign: 'center' }}>
+                  <div>
+                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 2px' }}>MGM</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#333', margin: 0 }}>{emb.referidosMGM}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 2px' }}>Buyers MGB</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#333', margin: 0 }}>{emb.buyersMGB}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 2px' }}>Coins</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#333', margin: 0 }}>🪙 {emb.coins}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleExpand(emb.id)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1.5px solid #E0E0E0', background: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#3483FA', whiteSpace: 'nowrap' }}
+                >
+                  {isExpanded ? 'Cerrar ▲' : 'Ver detalle →'}
+                </button>
+              </div>
+
+              {/* Detalle expandible */}
+              {isExpanded && (
+                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #F0F0F0' }}>
+                  {/* Sub-tabs */}
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: '#F5F5F5', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
+                    {(['mgm', 'mgb'] as const).map((tab) => (
+                      <button key={tab} onClick={() => setDetailTab(tab)} style={{
+                        padding: '6px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                        fontSize: '12px', fontWeight: 600,
+                        background: detailTab === tab ? '#fff' : 'transparent',
+                        color: detailTab === tab ? '#333' : '#999',
+                        boxShadow: detailTab === tab ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                      }}>
+                        {tab === 'mgm' ? 'Referidos MGM' : 'New Buyers MGB'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tab MGM */}
+                  {detailTab === 'mgm' && (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #F0F0F0' }}>
+                          {['Negocio','Estado','Hitos completados','Coins generados'].map(h => (
+                            <th key={h} style={{ textAlign: 'left', padding: '0 0 10px', fontSize: '11px', fontWeight: 600, color: '#999' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mgmData.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #F9F9F9' }}>
+                            <td style={{ padding: '10px 12px 10px 0', fontWeight: 500 }}>{r.negocio}</td>
+                            <td style={{ padding: '10px 12px 10px 0' }}><Pill estado={r.estado} /></td>
+                            <td style={{ padding: '10px 12px 10px 0', color: '#555' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>{r.hitos}/6 hitos</span>
+                                <div style={{ width: '60px', height: '4px', background: '#F0F0F0', borderRadius: '2px' }}>
+                                  <div style={{ width: `${(r.hitos / 6) * 100}%`, height: '100%', background: '#FFE600', borderRadius: '2px' }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 0', fontWeight: 700, color: '#00A650' }}>{r.coins} 🪙</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* Tab MGB */}
+                  {detailTab === 'mgb' && mgbData && (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                        {[
+                          { label: 'Compradores activos', value: `${mgbData.compradores}` },
+                          { label: 'NMV generado', value: `S/ ${mgbData.nmv.toLocaleString('es-PE')}` },
+                          { label: 'Compras totales', value: `${mgbData.compras}` },
+                          { label: 'Coins emitidos', value: `${mgbData.coins} 🪙` },
+                        ].map((s, i) => (
+                          <div key={i} style={{ background: '#F9F9F9', borderRadius: '8px', padding: '12px' }}>
+                            <p style={{ fontSize: '11px', color: '#999', margin: '0 0 4px' }}>{s.label}</p>
+                            <p style={{ fontSize: '16px', fontWeight: 700, color: '#333', margin: 0 }}>{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ background: '#F9F9F9', borderRadius: '8px', padding: '16px' }}>
+                        <p style={{ fontSize: '12px', fontWeight: 600, color: '#666', margin: '0 0 12px' }}>Compras por semana (últimas 4)</p>
+                        <BarChart data={mgbData.barData} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
+export default function Asesor() {
+  const [activeSection, setActiveSection] = useState<AsesorSection>('resumen')
+
+  return (
+    <Layout
+      role="asesor"
+      navItems={NAV_ITEMS}
+      activeSection={activeSection}
+      onNavigate={(id) => setActiveSection(id as AsesorSection)}
+      userName="Asesor Regional"
+      userSub="Lima Centro"
+      pageTitle={SECTION_TITLES[activeSection]}
+    >
+      {activeSection === 'resumen'          && <SeccionResumen />}
+      {activeSection === 'referidos-nuevos' && <SeccionReferidosNuevos />}
+      {activeSection === 'embajadores'      && <SeccionEmbajadores />}
+    </Layout>
   )
 }
